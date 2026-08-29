@@ -1,0 +1,1883 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0" />
+<meta name="theme-color" content="#FBF7F0" />
+<link rel="manifest" href="manifest.json" />
+<link rel="icon" href="icon-192.png" />
+<link rel="apple-touch-icon" href="icon-192.png" />
+<title>Darkroom — Image &amp; File Toolkit</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/docx/8.2.3/index.umd.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+  :root{
+    --bg:#FBF7F0;
+    --panel:#FFFFFF;
+    --panel-2:#F6EFE2;
+    --line:#E8DFCC;
+    --text:#2E2621;
+    --muted:#8A7F6E;
+    --safelight:#E2543A;
+    --safelight-dim:#F0B3A6;
+    --ok:#3F9D6E;
+    --header:#FFFFFF;
+    --shadow:0 2px 10px rgba(46,38,33,.06);
+    --mono: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
+  }
+  body.theme-dark{
+    --bg:#1B1B1F;
+    --panel:#222226;
+    --panel-2:#2B2B31;
+    --line:#38383F;
+    --text:#EDEAE4;
+    --muted:#9298A8;
+    --safelight-dim:#7a2e22;
+    --ok:#4F9D6E;
+    --header:#1B1B1F;
+    --shadow:0 2px 10px rgba(0,0,0,.45);
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;-webkit-tap-highlight-color:transparent;transition:background .2s,color .2s;}
+  body{padding-bottom:170px;min-height:100vh;}
+
+  header{
+    position:sticky;top:0;z-index:20;
+    background:var(--header);
+    padding:18px 18px 10px;
+    border-bottom:1px solid var(--line);
+    box-shadow:var(--shadow);
+    transition:background .2s;
+  }
+  .brand{display:flex;align-items:baseline;gap:8px;flex:1;}
+  .brand .dot{width:9px;height:9px;border-radius:50%;background:var(--safelight);box-shadow:0 0 8px 1px rgba(226,84,58,.35);}
+  .headerRow{display:flex;align-items:flex-start;justify-content:space-between;gap:10px;}
+  h1{font-size:20px;letter-spacing:0.02em;margin:0;font-weight:700;color:var(--text);}
+  .tagline{color:var(--muted);font-size:12px;margin-top:2px;}
+
+  .themeToggle{
+    display:flex;align-items:center;gap:6px;
+    background:var(--panel-2);border:1px solid var(--line);
+    border-radius:999px;padding:5px 5px;cursor:pointer;flex-shrink:0;
+  }
+  .themeToggle span{font-size:15px;line-height:1;padding:2px 5px;border-radius:999px;}
+  .themeToggle span.active{background:var(--safelight);}
+
+  main{max-width:520px;margin:0 auto;padding:16px;}
+
+  .card{
+    background:var(--panel);
+    border:1px solid var(--line);
+    border-radius:14px;
+    padding:16px;
+    margin-bottom:14px;
+    box-shadow:var(--shadow);
+  }
+  .card h2{
+    font-size:11px;text-transform:uppercase;letter-spacing:0.09em;
+    color:var(--safelight);margin:0 0 12px;font-weight:700;
+  }
+
+  .drop{
+    border:1.5px dashed var(--line);
+    border-radius:12px;
+    padding:26px 14px;
+    text-align:center;
+    color:var(--muted);
+    font-size:13px;
+    cursor:pointer;
+    transition:border-color .15s;
+  }
+  .drop:active{border-color:var(--safelight);}
+  .drop b{color:var(--text);}
+
+  .preview{
+    display:flex;align-items:center;gap:12px;
+    background:var(--panel-2);border:1px solid var(--line);
+    border-radius:10px;padding:10px;margin-top:10px;
+  }
+  .preview img{width:56px;height:56px;object-fit:cover;border-radius:6px;background:#000;}
+  .preview .meta{flex:1;min-width:0;}
+  .preview .meta .name{font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .preview .meta .size{font-family:var(--mono);font-size:11px;color:var(--muted);margin-top:2px;}
+  .preview .clear{color:var(--muted);background:none;border:none;font-size:18px;padding:4px 8px;cursor:pointer;}
+
+  label.field{display:block;font-size:12px;color:var(--muted);margin:12px 0 6px;}
+  input[type=number], input[type=text], select{
+    width:100%;background:var(--panel-2);border:1px solid var(--line);color:var(--text);
+    border-radius:8px;padding:10px 11px;font-size:14px;font-family:var(--mono);
+  }
+  select{font-family:inherit;}
+  .row{display:flex;gap:10px;}
+  .row > *{flex:1;}
+
+  .chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px;}
+  .chip{
+    background:var(--panel-2);border:1px solid var(--line);color:var(--muted);
+    font-size:12px;padding:6px 11px;border-radius:999px;cursor:pointer;
+  }
+  .chip.active{border-color:var(--safelight);color:var(--text);background:rgba(226,84,58,.12);}
+
+  .btn{
+    width:100%;padding:12px;border-radius:10px;border:none;
+    background:var(--safelight);color:#fff;font-weight:600;font-size:14px;
+    cursor:pointer;margin-top:14px;
+  }
+  .btn:disabled{background:var(--safelight-dim);color:#c9a49d;}
+  .btn.secondary{background:var(--panel-2);border:1px solid var(--line);color:var(--text);}
+
+  .readout{
+    font-family:var(--mono);font-size:12px;color:var(--muted);
+    display:flex;justify-content:space-between;margin-top:10px;
+    border-top:1px dotted var(--line);padding-top:10px;
+  }
+  .readout b{color:var(--ok);}
+
+  canvas{display:none;}
+
+  .result{
+    margin-top:12px;padding:12px;border-radius:10px;
+    background:rgba(79,157,110,.1);border:1px solid rgba(79,157,110,.35);
+    display:flex;align-items:center;gap:10px;
+  }
+  .result img{width:44px;height:44px;object-fit:cover;border-radius:6px;}
+  .result .info{flex:1;font-size:12px;color:var(--muted);}
+  .result a{
+    color:var(--ok);font-size:12px;font-weight:700;text-decoration:none;
+    border:1px solid var(--ok);padding:6px 10px;border-radius:7px;
+  }
+
+  .filmstrip{
+    position:fixed;bottom:0;left:0;right:0;z-index:30;
+    background:var(--header);border-top:1px solid var(--line);
+    display:flex;flex-wrap:wrap;
+    max-height:40vh;overflow-y:auto;
+    box-shadow:0 -2px 10px rgba(46,38,33,.06);
+  }
+  .tool-btn{
+    flex:1 1 25%;min-width:64px;display:flex;flex-direction:column;align-items:center;gap:5px;
+    padding:13px 4px 10px;background:none;border:none;color:var(--muted);font-size:11px;cursor:pointer;
+    position:relative;
+  }
+  .tool-btn .sprockets{position:absolute;top:0;left:0;right:0;display:flex;justify-content:space-evenly;padding:0 4px;}
+  .tool-btn .sprockets span{width:3px;height:3px;border-radius:50%;background:var(--line);margin-top:2px;}
+  .tool-btn.active{color:var(--text);}
+  .tool-btn.active .ic{color:var(--safelight);}
+  .tool-btn .ic{font-size:27px;line-height:1;}
+
+  .catTabs{display:flex;gap:6px;margin-top:12px;}
+  .catTab{
+    flex:1;text-align:center;padding:8px;border-radius:8px;
+    font-size:12px;font-weight:600;letter-spacing:0.03em;
+    background:var(--panel-2);border:1px solid var(--line);color:var(--muted);cursor:pointer;
+  }
+  .catTab.active{background:rgba(226,84,58,.14);border-color:var(--safelight);color:var(--text);}
+
+  .unitPicker{display:flex;gap:6px;margin-top:6px;}
+  .unitPicker .chip{flex:1;text-align:center;}
+
+  .hint{font-size:11.5px;color:var(--muted);line-height:1.5;margin-top:8px;}
+  .warn{font-size:11.5px;color:#8A5A0F;background:rgba(217,167,96,.18);border:1px solid rgba(217,167,96,.55);padding:8px 10px;border-radius:8px;margin-top:10px;}
+
+  ::selection{background:var(--safelight);color:#fff;}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="headerRow">
+    <div class="brand"><span class="dot"></span><h1>DARKROOM</h1></div>
+    <div class="themeToggle" id="themeToggle">
+      <span id="lightIcon">☀️</span><span id="darkIcon">🌙</span>
+    </div>
+  </div>
+  <div class="tagline">Image &amp; file tools · runs on your device · nothing uploaded</div>
+  <div class="catTabs" id="catTabs"></div>
+</header>
+
+<main id="app"></main>
+
+<div class="filmstrip" id="filmstrip"></div>
+
+<canvas id="workCanvas"></canvas>
+
+<script>
+const CATEGORIES = [
+  {id:'image', label:'IMAGES'},
+  {id:'file', label:'FILES (PDF)'},
+];
+
+const TOOLS_IMAGE = [
+  {id:'compress', icon:'◐', label:'Compress'},
+  {id:'resize', icon:'⤢', label:'Resize'},
+  {id:'convert', icon:'⇄', label:'Convert'},
+  {id:'crop', icon:'▦', label:'Crop/Rotate'},
+  {id:'effects', icon:'✺', label:'Effects'},
+  {id:'topdf', icon:'▤', label:'To PDF'},
+  {id:'passport', icon:'🪪', label:'Passport Photo'},
+];
+
+const TOOLS_FILE = [
+  {id:'mergepdf', icon:'⧉', label:'Merge PDF'},
+  {id:'splitpdf', icon:'✂', label:'Split PDF'},
+  {id:'editpdf', icon:'✎', label:'Edit PDF'},
+  {id:'pdftoimages', icon:'🖼', label:'PDF to Images'},
+  {id:'compresspdf', icon:'◐', label:'Compress PDF'},
+  {id:'docxtopdf', icon:'⇥', label:'DOCX→PDF'},
+  {id:'pdftodocx', icon:'⇤', label:'PDF→DOCX'},
+  {id:'pdftoexcel', icon:'▥', label:'PDF→Excel'},
+];
+
+let state = {
+  category: 'image',
+  tool: 'compress',
+  file: null,
+  img: null, // HTMLImageElement
+  objectUrl: null,
+  pdfFiles: [], // for topdf: array of {file, img}
+  pdfDocs: [],  // for mergepdf: array of {file, bytes}
+  splitFile: null,
+  splitBytes: null,
+  splitPageCount: null,
+  editFile: null,
+  editBytes: null,
+  editPages: [], // {index, rotation, deleted, thumbUrl}
+  docxFile: null,
+  pdfToConvertFile: null,
+  pdfToConvertBytes: null,
+  passportFile: null,
+  passportImg: null,
+  passportObjectUrl: null,
+  passportDocKey: 'us-2x2',
+  passportZoom: 1,
+  passportOffX: 0,
+  passportOffY: 0,
+  passportResultUrl: null,
+  passportResultW: null,
+  passportResultH: null,
+  passportResultDocKey: null,
+  pdfImagesFile: null,
+  pdfImagesBytes: null,
+  compressPdfFile: null,
+  compressPdfBytes: null,
+};
+
+const app = document.getElementById('app');
+const filmstrip = document.getElementById('filmstrip');
+const catTabs = document.getElementById('catTabs');
+const canvas = document.getElementById('workCanvas');
+const ctx = canvas.getContext('2d');
+
+function currentTools(){
+  return state.category === 'image' ? TOOLS_IMAGE : TOOLS_FILE;
+}
+
+function renderCatTabs(){
+  catTabs.innerHTML = CATEGORIES.map(c => `
+    <div class="catTab ${state.category===c.id?'active':''}" data-cat="${c.id}">${c.label}</div>
+  `).join('');
+  catTabs.querySelectorAll('.catTab').forEach(b=>{
+    b.addEventListener('click', ()=>{
+      state.category = b.dataset.cat;
+      state.tool = currentToolsFor(state.category)[0].id;
+      render();
+    });
+  });
+}
+function currentToolsFor(cat){
+  return cat === 'image' ? TOOLS_IMAGE : TOOLS_FILE;
+}
+
+function fmtSize(bytes){
+  if(bytes < 1024) return bytes + ' B';
+  if(bytes < 1024*1024) return (bytes/1024).toFixed(1) + ' KB';
+  return (bytes/1024/1024).toFixed(2) + ' MB';
+}
+
+function renderFilmstrip(){
+  filmstrip.innerHTML = currentTools().map(t => `
+    <button class="tool-btn ${state.tool===t.id?'active':''}" data-tool="${t.id}">
+      <span class="sprockets"><span></span><span></span><span></span></span>
+      <span class="ic">${t.icon}</span>
+      <span>${t.label}</span>
+    </button>
+  `).join('');
+  filmstrip.querySelectorAll('.tool-btn').forEach(b=>{
+    b.addEventListener('click', ()=>{ state.tool = b.dataset.tool; render(); });
+  });
+}
+
+function loadFileInto(file, cb){
+  const url = URL.createObjectURL(file);
+  const img = new Image();
+  img.onload = () => cb(img, url);
+  img.src = url;
+}
+
+function fileInputHTML(id, multiple){
+  return `<input type="file" id="${id}" accept="image/*" ${multiple?'multiple':''} style="display:none" />`;
+}
+
+function dropZoneHTML(text){
+  return `<div class="drop" id="dropZone"><b>Tap to choose an image</b><br/>${text}</div>`;
+}
+
+function previewHTML(file, extra){
+  return `
+    <div class="preview">
+      <img src="${state.objectUrl}" />
+      <div class="meta">
+        <div class="name">${file.name}</div>
+        <div class="size">${fmtSize(file.size)} ${extra?('· '+extra):''}</div>
+      </div>
+      <button class="clear" id="clearFile">✕</button>
+    </div>`;
+}
+
+function wireDropZone(onFile){
+  const dz = document.getElementById('dropZone');
+  const inputId = 'fileInput';
+  if(!document.getElementById(inputId)){
+    const inp = document.createElement('input');
+    inp.type='file'; inp.accept='image/*'; inp.id=inputId; inp.style.display='none';
+    document.body.appendChild(inp);
+  }
+  const inp = document.getElementById(inputId);
+  if(dz){
+    dz.addEventListener('click', ()=> inp.click());
+  }
+  inp.onchange = (e) => {
+    const f = e.target.files[0];
+    if(f) onFile(f);
+    inp.value = '';
+  };
+}
+
+function wireClear(){
+  const cb = document.getElementById('clearFile');
+  if(cb) cb.addEventListener('click', ()=>{
+    state.file = null; state.img = null;
+    if(state.objectUrl) URL.revokeObjectURL(state.objectUrl);
+    state.objectUrl = null;
+    render();
+  });
+}
+
+function downloadCanvas(mime, quality, filenameBase, ext){
+  return new Promise(resolve=>{
+    canvas.toBlob((blob)=>{
+      const url = URL.createObjectURL(blob);
+      resolve({blob, url, size: blob.size, name: filenameBase + '.' + ext});
+    }, mime, quality);
+  });
+}
+
+function resultHTML(res){
+  return `
+    <div class="result">
+      <img src="${res.url}" />
+      <div class="info">${res.name}<br/>${fmtSize(res.size)}</div>
+      <a href="${res.url}" download="${res.name}">Save</a>
+    </div>`;
+}
+
+// ---------------- COMPRESS ----------------
+function extToMime(ext){
+  if(ext==='png') return 'image/png';
+  if(ext==='webp') return 'image/webp';
+  return 'image/jpeg';
+}
+function fileExt(file){
+  const t = file.type;
+  if(t==='image/png') return 'png';
+  if(t==='image/webp') return 'webp';
+  return 'jpg';
+}
+function renderCompress(){
+  const srcExt = state.file ? fileExt(state.file) : null;
+  app.innerHTML = `
+    <div class="card">
+      <h2>Source image</h2>
+      ${state.file ? previewHTML(state.file, state.img?`${state.img.naturalWidth}×${state.img.naturalHeight}px`:'') : dropZoneHTML('JPG, PNG or WEBP')}
+      <div class="hint">Dimensions stay exactly the same here — this only reduces file size. Use the Resize tool separately if you also want smaller dimensions.</div>
+    </div>
+    ${state.file ? `
+    <div class="card" id="opts">
+      <h2>Output format</h2>
+      <div class="chips" id="fmtChips">
+        <div class="chip active" data-fmt="${srcExt}">Same as original (.${srcExt})</div>
+        ${srcExt!=='jpg'?'<div class="chip" data-fmt="jpg">JPEG (smallest)</div>':''}
+        ${srcExt!=='webp'?'<div class="chip" data-fmt="webp">WEBP (smaller, lossy)</div>':''}
+      </div>
+      ${srcExt==='png' ? `<div class="warn">PNG is lossless, so it can't be quality-compressed the way JPG can — "Same as original" will only strip a little extra data. For real size reduction, pick JPEG or WEBP (note: transparency will be lost).</div>` : ''}
+
+      <h2 style="margin-top:16px">Target size</h2>
+      <div class="row">
+        <input type="number" id="targetKb" placeholder="e.g. 100" value="100" />
+        <select id="targetUnit"><option value="kb">KB</option><option value="mb">MB</option></select>
+      </div>
+      <div class="chips">
+        ${[20,50,100,200,500].map(k=>`<div class="chip" data-kb="${k}">${k}KB</div>`).join('')}
+      </div>
+      <button class="btn" id="runBtn">Compress</button>
+      <div class="hint">For JPEG/WEBP, quality is lowered step by step until it's at or under your target. Very small targets on large photos may need heavy quality loss.</div>
+      <div id="resultBox"></div>
+    </div>` : ''}
+  `;
+  wireDropZone((f)=>{
+    state.file = f;
+    loadFileInto(f, (img, url)=>{ state.img = img; state.objectUrl = url; render(); });
+  });
+  wireClear();
+  let outFmt = srcExt;
+  const fmtChips = app.querySelectorAll('#fmtChips .chip');
+  fmtChips.forEach(c=>c.addEventListener('click', ()=>{
+    fmtChips.forEach(x=>x.classList.remove('active')); c.classList.add('active'); outFmt = c.dataset.fmt;
+  }));
+  const kbChips = app.querySelectorAll('#opts > .chips:nth-of-type(2) .chip, .chips .chip[data-kb]');
+  app.querySelectorAll('.chip[data-kb]').forEach(c=>c.addEventListener('click', ()=>{
+    document.getElementById('targetKb').value = c.dataset.kb;
+    document.getElementById('targetUnit').value = 'kb';
+    app.querySelectorAll('.chip[data-kb]').forEach(x=>x.classList.remove('active'));
+    c.classList.add('active');
+  }));
+  const runBtn = document.getElementById('runBtn');
+  if(runBtn) runBtn.addEventListener('click', async ()=>{
+    runBtn.disabled = true; runBtn.textContent = 'Compressing…';
+    const kbVal = parseFloat(document.getElementById('targetKb').value)||100;
+    const unit = document.getElementById('targetUnit').value;
+    const targetBytes = unit==='mb' ? kbVal*1024*1024 : kbVal*1024;
+
+    canvas.width = state.img.naturalWidth;
+    canvas.height = state.img.naturalHeight;
+    if(outFmt!=='png'){ ctx.fillStyle = '#fff'; ctx.fillRect(0,0,canvas.width,canvas.height); }
+    else ctx.clearRect(0,0,canvas.width,canvas.height);
+    ctx.drawImage(state.img, 0, 0);
+
+    const mime = extToMime(outFmt);
+    let best = null;
+    if(outFmt==='png'){
+      best = await downloadCanvas('image/png', 1, 'compressed', 'png');
+    } else {
+      let quality = 0.92;
+      for(let i=0;i<10;i++){
+        const res = await downloadCanvas(mime, quality, 'compressed', outFmt);
+        best = res;
+        if(res.size <= targetBytes || quality <= 0.1) break;
+        quality -= 0.09;
+      }
+    }
+    document.getElementById('resultBox').innerHTML = resultHTML(best) +
+      (outFmt!=='png' && best.size > targetBytes ? `<div class="warn">Couldn't quite reach your target without heavy quality loss — this is the smallest reasonable result.</div>` : '');
+    runBtn.disabled = false; runBtn.textContent = 'Compress';
+  });
+}
+
+// ---------------- RESIZE ----------------
+const PRESETS = {
+  'Passport (2x2 in)': {w:600,h:600},
+  'A4 (300dpi)': {w:2480,h:3508},
+  'Instagram Square': {w:1080,h:1080},
+  'WhatsApp DP': {w:500,h:500},
+  'YouTube Banner': {w:2560,h:1440},
+  'PAN Card Photo': {w:213,h:213},
+};
+function renderResize(){
+  app.innerHTML = `
+    <div class="card">
+      <h2>Source image</h2>
+      ${state.file ? previewHTML(state.file, state.img?`${state.img.naturalWidth}×${state.img.naturalHeight}px`:'') : dropZoneHTML('Any image format')}
+    </div>
+    ${state.file ? `
+    <div class="card">
+      <h2>Dimensions</h2>
+      <div class="row">
+        <div><label class="field">Width</label><input type="number" id="rw" value="${state.img.naturalWidth}"></div>
+        <div><label class="field">Height</label><input type="number" id="rh" value="${state.img.naturalHeight}"></div>
+      </div>
+      <label class="field">Unit</label>
+      <div class="unitPicker" id="unitPicker">
+        <div class="chip active" data-unit="px">Pixels</div>
+        <div class="chip" data-unit="cm">Centimeters</div>
+        <div class="chip" data-unit="mm">Millimeters</div>
+        <div class="chip" data-unit="in">Inches</div>
+      </div>
+      <div class="hint" id="unitHint">Exact pixel dimensions.</div>
+      <label class="field">Or pick a preset</label>
+      <select id="rPreset">
+        <option value="">— Custom —</option>
+        ${Object.keys(PRESETS).map(k=>`<option value="${k}">${k}</option>`).join('')}
+      </select>
+      <label style="display:flex;align-items:center;gap:8px;margin-top:12px;font-size:13px;color:var(--muted)">
+        <input type="checkbox" id="lockAspect" checked style="width:auto"/> Lock aspect ratio
+      </label>
+      <button class="btn" id="runBtn">Resize</button>
+      <div id="resultBox"></div>
+    </div>` : ''}
+  `;
+  wireDropZone((f)=>{
+    state.file = f;
+    loadFileInto(f, (img, url)=>{ state.img = img; state.objectUrl = url; render(); });
+  });
+  wireClear();
+  let resizeUnit = 'px';
+  const unitHints = {
+    px: 'Exact pixel dimensions.',
+    cm: 'Centimeters, converted at 300 DPI (standard print quality).',
+    mm: 'Millimeters, converted at 300 DPI (standard print quality).',
+    in: 'Inches, converted at 300 DPI (standard print quality).',
+  };
+  const unitChips = app.querySelectorAll('#unitPicker .chip');
+  unitChips.forEach(c=>c.addEventListener('click', ()=>{
+    unitChips.forEach(x=>x.classList.remove('active')); c.classList.add('active');
+    resizeUnit = c.dataset.unit;
+    document.getElementById('unitHint').textContent = unitHints[resizeUnit];
+  }));
+  const presetSel = document.getElementById('rPreset');
+  if(presetSel) presetSel.addEventListener('change', ()=>{
+    const p = PRESETS[presetSel.value];
+    if(p){
+      document.getElementById('rw').value = p.w; document.getElementById('rh').value = p.h;
+      resizeUnit = 'px';
+      unitChips.forEach(x=>x.classList.remove('active'));
+      app.querySelector('#unitPicker .chip[data-unit="px"]').classList.add('active');
+      document.getElementById('unitHint').textContent = unitHints.px;
+    }
+  });
+  const rw = document.getElementById('rw'), rh = document.getElementById('rh');
+  const ratio = state.img ? state.img.naturalWidth/state.img.naturalHeight : 1;
+  if(rw) rw.addEventListener('input', ()=>{
+    if(document.getElementById('lockAspect').checked) rh.value = Math.round(rw.value/ratio);
+  });
+  if(rh) rh.addEventListener('input', ()=>{
+    if(document.getElementById('lockAspect').checked) rw.value = Math.round(rh.value*ratio);
+  });
+  const runBtn = document.getElementById('runBtn');
+  if(runBtn) runBtn.addEventListener('click', async ()=>{
+    const unit = resizeUnit;
+    let w = parseFloat(rw.value), h = parseFloat(rh.value);
+    const DPI = 300;
+    if(unit==='cm'){ w = w/2.54*DPI; h = h/2.54*DPI; }
+    if(unit==='mm'){ w = w/25.4*DPI; h = h/25.4*DPI; }
+    if(unit==='in'){ w = w*DPI; h = h*DPI; }
+    w = Math.round(w); h = Math.round(h);
+    canvas.width = w; canvas.height = h;
+    ctx.clearRect(0,0,w,h);
+    ctx.drawImage(state.img, 0, 0, w, h);
+    const res = await downloadCanvas('image/png', 1, `resized-${w}x${h}`, 'png');
+    document.getElementById('resultBox').innerHTML = resultHTML(res);
+  });
+}
+
+// ---------------- CONVERT ----------------
+function renderConvert(){
+  app.innerHTML = `
+    <div class="card">
+      <h2>Source image</h2>
+      ${state.file ? previewHTML(state.file) : dropZoneHTML('JPG, PNG, WEBP, BMP')}
+    </div>
+    ${state.file ? `
+    <div class="card">
+      <h2>Convert to</h2>
+      <div class="chips" id="fmtChips">
+        <div class="chip active" data-fmt="jpg">JPG</div>
+        <div class="chip" data-fmt="png">PNG</div>
+        <div class="chip" data-fmt="webp">WEBP</div>
+      </div>
+      <div class="warn">HEIC files can't be read directly in-browser — if your photo is .heic, first share/export it as JPG from your phone's gallery, then convert here.</div>
+      <button class="btn" id="runBtn">Convert</button>
+      <div id="resultBox"></div>
+    </div>` : ''}
+  `;
+  wireDropZone((f)=>{
+    state.file = f;
+    loadFileInto(f, (img, url)=>{ state.img = img; state.objectUrl = url; render(); });
+  });
+  wireClear();
+  let fmt = 'jpg';
+  const chips = app.querySelectorAll('#fmtChips .chip');
+  chips.forEach(c=>c.addEventListener('click', ()=>{
+    chips.forEach(x=>x.classList.remove('active')); c.classList.add('active'); fmt = c.dataset.fmt;
+  }));
+  const runBtn = document.getElementById('runBtn');
+  if(runBtn) runBtn.addEventListener('click', async ()=>{
+    canvas.width = state.img.naturalWidth; canvas.height = state.img.naturalHeight;
+    if(fmt==='jpg'){ ctx.fillStyle='#fff'; ctx.fillRect(0,0,canvas.width,canvas.height); }
+    else ctx.clearRect(0,0,canvas.width,canvas.height);
+    ctx.drawImage(state.img,0,0);
+    const mimeMap = {jpg:'image/jpeg', png:'image/png', webp:'image/webp'};
+    const res = await downloadCanvas(mimeMap[fmt], 0.95, 'converted', fmt);
+    document.getElementById('resultBox').innerHTML = resultHTML(res);
+  });
+}
+
+// ---------------- CROP / ROTATE ----------------
+function renderCrop(){
+  app.innerHTML = `
+    <div class="card">
+      <h2>Source image</h2>
+      ${state.file ? previewHTML(state.file) : dropZoneHTML('Any image format')}
+    </div>
+    ${state.file ? `
+    <div class="card">
+      <h2>Rotate &amp; flip</h2>
+      <div class="chips">
+        <div class="chip" id="rot90">Rotate 90°</div>
+        <div class="chip" id="rot180">Rotate 180°</div>
+        <div class="chip" id="flipH">Flip ↔</div>
+        <div class="chip" id="flipV">Flip ↕</div>
+      </div>
+      <div class="hint">Each tap applies immediately and updates the preview below.</div>
+      <div class="preview" style="margin-top:12px"><img id="livePreview" src="${state.objectUrl}" style="width:100%;height:160px;object-fit:contain;background:#000"/></div>
+      <button class="btn" id="saveBtn">Save this version</button>
+      <div id="resultBox"></div>
+    </div>
+    <div class="card">
+      <h2>Crop</h2>
+      <div class="row">
+        <div><label class="field">Left %</label><input type="number" id="cLeft" value="0" min="0" max="90"></div>
+        <div><label class="field">Top %</label><input type="number" id="cTop" value="0" min="0" max="90"></div>
+      </div>
+      <div class="row">
+        <div><label class="field">Width %</label><input type="number" id="cW" value="100" min="10" max="100"></div>
+        <div><label class="field">Height %</label><input type="number" id="cH" value="100" min="10" max="100"></div>
+      </div>
+      <div class="hint">Percent of the current image — e.g. Left 25 / Width 50 keeps the middle half horizontally.</div>
+      <button class="btn secondary" id="cropBtn">Crop</button>
+      <div id="cropResultBox"></div>
+    </div>` : ''}
+  `;
+  wireDropZone((f)=>{
+    state.file = f;
+    loadFileInto(f, (img, url)=>{ state.img = img; state.objectUrl = url; render(); });
+  });
+  wireClear();
+
+  function applyTransform(rotateDeg, flipH, flipV){
+    const w = state.img.naturalWidth, h = state.img.naturalHeight;
+    const swap = Math.abs(rotateDeg)%180 === 90;
+    canvas.width = swap? h : w;
+    canvas.height = swap? w : h;
+    ctx.save();
+    ctx.translate(canvas.width/2, canvas.height/2);
+    ctx.rotate(rotateDeg*Math.PI/180);
+    ctx.scale(flipH?-1:1, flipV?-1:1);
+    ctx.drawImage(state.img, -w/2, -h/2, w, h);
+    ctx.restore();
+  }
+  const rot90 = document.getElementById('rot90');
+  const rot180 = document.getElementById('rot180');
+  const flipHb = document.getElementById('flipH');
+  const flipVb = document.getElementById('flipV');
+  const live = document.getElementById('livePreview');
+  const applyAndPreview = (deg, fh, fv) => {
+    applyTransform(deg, fh, fv);
+    canvas.toBlob(b=>{ live.src = URL.createObjectURL(b); });
+  };
+  if(rot90) rot90.addEventListener('click', ()=>applyAndPreview(90,false,false));
+  if(rot180) rot180.addEventListener('click', ()=>applyAndPreview(180,false,false));
+  if(flipHb) flipHb.addEventListener('click', ()=>applyAndPreview(0,true,false));
+  if(flipVb) flipVb.addEventListener('click', ()=>applyAndPreview(0,false,true));
+
+  const saveBtn = document.getElementById('saveBtn');
+  if(saveBtn) saveBtn.addEventListener('click', async ()=>{
+    const res = await downloadCanvas('image/png',1,'edited','png');
+    document.getElementById('resultBox').innerHTML = resultHTML(res);
+  });
+
+  const cropBtn = document.getElementById('cropBtn');
+  if(cropBtn) cropBtn.addEventListener('click', async ()=>{
+    const w = state.img.naturalWidth, h = state.img.naturalHeight;
+    const l = parseFloat(document.getElementById('cLeft').value)/100*w;
+    const t = parseFloat(document.getElementById('cTop').value)/100*h;
+    const cw = parseFloat(document.getElementById('cW').value)/100*w;
+    const ch = parseFloat(document.getElementById('cH').value)/100*h;
+    canvas.width = cw; canvas.height = ch;
+    ctx.clearRect(0,0,cw,ch);
+    ctx.drawImage(state.img, l, t, cw, ch, 0, 0, cw, ch);
+    const res = await downloadCanvas('image/png',1,'cropped','png');
+    document.getElementById('cropResultBox').innerHTML = resultHTML(res);
+  });
+}
+
+// ---------------- EFFECTS ----------------
+function renderEffects(){
+  app.innerHTML = `
+    <div class="card">
+      <h2>Source image</h2>
+      ${state.file ? previewHTML(state.file) : dropZoneHTML('Any image format')}
+    </div>
+    ${state.file ? `
+    <div class="card">
+      <h2>Effect</h2>
+      <div class="chips" id="fxChips">
+        <div class="chip active" data-fx="grayscale">Grayscale</div>
+        <div class="chip" data-fx="bw">Black &amp; White</div>
+        <div class="chip" data-fx="border">Add Border</div>
+        <div class="chip" data-fx="watermark">Text Watermark</div>
+      </div>
+      <div id="fxOptions"></div>
+      <button class="btn" id="runBtn">Apply</button>
+      <div id="resultBox"></div>
+    </div>` : ''}
+  `;
+  wireDropZone((f)=>{
+    state.file = f;
+    loadFileInto(f, (img, url)=>{ state.img = img; state.objectUrl = url; render(); });
+  });
+  wireClear();
+  let fx = 'grayscale';
+  const chips = app.querySelectorAll('#fxChips .chip');
+  const opts = document.getElementById('fxOptions');
+  function renderOpts(){
+    if(fx==='border') opts.innerHTML = `<label class="field">Border width (px)</label><input type="number" id="borderW" value="24">
+      <label class="field">Border color</label><input type="text" id="borderC" value="#ffffff">`;
+    else if(fx==='watermark') opts.innerHTML = `<label class="field">Watermark text</label><input type="text" id="wmText" value="© your shop">
+      <label class="field">Opacity (0–1)</label><input type="number" id="wmOpacity" value="0.5" step="0.1" min="0.1" max="1">`;
+    else opts.innerHTML = '';
+  }
+  if(opts) renderOpts();
+  chips.forEach(c=>c.addEventListener('click', ()=>{
+    chips.forEach(x=>x.classList.remove('active')); c.classList.add('active'); fx = c.dataset.fx; renderOpts();
+  }));
+  const runBtn = document.getElementById('runBtn');
+  if(runBtn) runBtn.addEventListener('click', async ()=>{
+    const w = state.img.naturalWidth, h = state.img.naturalHeight;
+    if(fx==='border'){
+      const bw = parseInt(document.getElementById('borderW').value)||24;
+      const bc = document.getElementById('borderC').value||'#ffffff';
+      canvas.width = w+bw*2; canvas.height = h+bw*2;
+      ctx.fillStyle = bc; ctx.fillRect(0,0,canvas.width,canvas.height);
+      ctx.drawImage(state.img, bw, bw, w, h);
+    } else if(fx==='watermark'){
+      canvas.width = w; canvas.height = h;
+      ctx.drawImage(state.img,0,0);
+      const text = document.getElementById('wmText').value||'';
+      const op = parseFloat(document.getElementById('wmOpacity').value)||0.5;
+      ctx.globalAlpha = op;
+      ctx.fillStyle = '#fff';
+      ctx.font = `${Math.round(w/18)}px sans-serif`;
+      ctx.textAlign = 'center';
+      ctx.fillText(text, w/2, h-Math.round(h*0.05));
+      ctx.globalAlpha = 1;
+    } else {
+      canvas.width = w; canvas.height = h;
+      ctx.drawImage(state.img,0,0);
+      const data = ctx.getImageData(0,0,w,h);
+      for(let i=0;i<data.data.length;i+=4){
+        const avg = 0.299*data.data[i]+0.587*data.data[i+1]+0.114*data.data[i+2];
+        const v = fx==='bw' ? (avg>128?255:0) : avg;
+        data.data[i]=data.data[i+1]=data.data[i+2]=v;
+      }
+      ctx.putImageData(data,0,0);
+    }
+    const res = await downloadCanvas('image/png',1,fx,'png');
+    document.getElementById('resultBox').innerHTML = resultHTML(res);
+  });
+}
+
+// ---------------- IMAGE TO PDF ----------------
+function renderToPdf(){
+  app.innerHTML = `
+    <div class="card">
+      <h2>Images (in order)</h2>
+      ${dropZoneHTML('Add one or more images — tap again to add more')}
+      <div id="pdfList"></div>
+    </div>
+    ${state.pdfFiles.length ? `
+    <div class="card">
+      <h2>Export</h2>
+      <button class="btn" id="runBtn">Create PDF (${state.pdfFiles.length} page${state.pdfFiles.length>1?'s':''})</button>
+      <div id="resultBox"></div>
+    </div>` : ''}
+  `;
+  const dz = document.getElementById('dropZone');
+  const inputId = 'pdfInput';
+  if(!document.getElementById(inputId)){
+    const inp = document.createElement('input');
+    inp.type='file'; inp.accept='image/*'; inp.multiple = true; inp.id=inputId; inp.style.display='none';
+    document.body.appendChild(inp);
+  }
+  const inp = document.getElementById(inputId);
+  dz.addEventListener('click', ()=> inp.click());
+  inp.onchange = (e) => {
+    const files = Array.from(e.target.files);
+    let pending = files.length;
+    files.forEach(f=>{
+      loadFileInto(f, (img,url)=>{
+        state.pdfFiles.push({file:f, img, url});
+        pending--;
+        if(pending===0) render();
+      });
+    });
+    inp.value='';
+  };
+  renderPdfList();
+
+  const runBtn = document.getElementById('runBtn');
+  if(runBtn) runBtn.addEventListener('click', async ()=>{
+    runBtn.disabled = true; runBtn.textContent = 'Building PDF…';
+    const { jsPDF } = window.jspdf;
+    const pdf = new jsPDF({unit:'pt'});
+    state.pdfFiles.forEach((item, idx)=>{
+      const pageW = pdf.internal.pageSize.getWidth();
+      const pageH = pdf.internal.pageSize.getHeight();
+      const ratio = Math.min(pageW/item.img.naturalWidth, pageH/item.img.naturalHeight);
+      const w = item.img.naturalWidth*ratio, h = item.img.naturalHeight*ratio;
+      const x = (pageW-w)/2, y = (pageH-h)/2;
+      if(idx>0) pdf.addPage();
+      pdf.addImage(item.img, 'JPEG', x, y, w, h);
+    });
+    const blob = pdf.output('blob');
+    const url = URL.createObjectURL(blob);
+    document.getElementById('resultBox').innerHTML = `
+      <div class="result">
+        <div class="info">${state.pdfFiles.length} page PDF · ${fmtSize(blob.size)}</div>
+        <a href="${url}" download="images.pdf">Save</a>
+      </div>`;
+    runBtn.disabled = false; runBtn.textContent = `Create PDF (${state.pdfFiles.length} pages)`;
+  });
+}
+function renderPdfList(){
+  const list = document.getElementById('pdfList');
+  if(!list) return;
+  list.innerHTML = state.pdfFiles.map((item,idx)=>`
+    <div class="preview">
+      <img src="${item.url}"/>
+      <div class="meta"><div class="name">${idx+1}. ${item.file.name}</div><div class="size">${fmtSize(item.file.size)}</div></div>
+      <button class="clear" data-idx="${idx}">✕</button>
+    </div>`).join('');
+  list.querySelectorAll('.clear').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      state.pdfFiles.splice(parseInt(btn.dataset.idx),1);
+      render();
+    });
+  });
+}
+
+// ---------------- MERGE PDF (Files category) ----------------
+function renderMergePdf(){
+  app.innerHTML = `
+    <div class="card">
+      <h2>PDF files (in order)</h2>
+      ${pdfDropZoneHTML('Add two or more PDFs to merge — tap again to add more')}
+      <div id="mergeList"></div>
+    </div>
+    ${state.pdfDocs.length>1 ? `
+    <div class="card">
+      <h2>Export</h2>
+      <button class="btn" id="runBtn">Merge into one PDF (${state.pdfDocs.length} files)</button>
+      <div id="resultBox"></div>
+    </div>` : state.pdfDocs.length===1 ? `<div class="hint" style="padding:0 4px">Add at least one more PDF to merge.</div>` : ''}
+  `;
+  const dz = document.getElementById('dropZone');
+  const inputId = 'mergeInput';
+  if(!document.getElementById(inputId)){
+    const inp = document.createElement('input');
+    inp.type='file'; inp.accept='application/pdf'; inp.multiple = true; inp.id=inputId; inp.style.display='none';
+    document.body.appendChild(inp);
+  }
+  const inp = document.getElementById(inputId);
+  dz.addEventListener('click', ()=> inp.click());
+  inp.onchange = async (e) => {
+    const files = Array.from(e.target.files);
+    for(const f of files){
+      const bytes = await f.arrayBuffer();
+      state.pdfDocs.push({file:f, bytes});
+    }
+    inp.value = '';
+    render();
+  };
+  renderMergeList();
+
+  const runBtn = document.getElementById('runBtn');
+  if(runBtn) runBtn.addEventListener('click', async ()=>{
+    runBtn.disabled = true; runBtn.textContent = 'Merging…';
+    const { PDFDocument } = PDFLib;
+    const merged = await PDFDocument.create();
+    for(const item of state.pdfDocs){
+      const src = await PDFDocument.load(item.bytes);
+      const pages = await merged.copyPages(src, src.getPageIndices());
+      pages.forEach(p => merged.addPage(p));
+    }
+    const bytes = await merged.save();
+    const blob = new Blob([bytes], {type:'application/pdf'});
+    const url = URL.createObjectURL(blob);
+    document.getElementById('resultBox').innerHTML = `
+      <div class="result">
+        <div class="info">Merged PDF · ${fmtSize(blob.size)}</div>
+        <a href="${url}" download="merged.pdf">Save</a>
+      </div>`;
+    runBtn.disabled = false; runBtn.textContent = `Merge into one PDF (${state.pdfDocs.length} files)`;
+  });
+}
+function renderMergeList(){
+  const list = document.getElementById('mergeList');
+  if(!list) return;
+  list.innerHTML = state.pdfDocs.map((item,idx)=>`
+    <div class="preview">
+      <div class="meta"><div class="name">${idx+1}. ${item.file.name}</div><div class="size">${fmtSize(item.file.size)}</div></div>
+      <button class="clear" data-idx="${idx}">✕</button>
+    </div>`).join('');
+  list.querySelectorAll('.clear').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      state.pdfDocs.splice(parseInt(btn.dataset.idx),1);
+      render();
+    });
+  });
+}
+function pdfDropZoneHTML(text){
+  return `<div class="drop" id="dropZone"><b>Tap to choose PDF file(s)</b><br/>${text}</div>`;
+}
+
+// ---------------- SPLIT PDF (Files category) ----------------
+function renderSplitPdf(){
+  app.innerHTML = `
+    <div class="card">
+      <h2>PDF file</h2>
+      ${state.splitFile ? `
+        <div class="preview">
+          <div class="meta"><div class="name">${state.splitFile.name}</div><div class="size">${fmtSize(state.splitFile.size)} ${state.splitPageCount?('· '+state.splitPageCount+' pages'):''}</div></div>
+          <button class="clear" id="clearSplit">✕</button>
+        </div>
+      ` : pdfDropZoneHTML('Choose one PDF to extract pages from')}
+    </div>
+    ${state.splitFile && state.splitPageCount ? `
+    <div class="card">
+      <h2>Pages to extract</h2>
+      <div class="row">
+        <div><label class="field">From page</label><input type="number" id="pFrom" value="1" min="1" max="${state.splitPageCount}"></div>
+        <div><label class="field">To page</label><input type="number" id="pTo" value="${state.splitPageCount}" min="1" max="${state.splitPageCount}"></div>
+      </div>
+      <div class="hint">This document has ${state.splitPageCount} page(s).</div>
+      <button class="btn" id="runBtn">Extract pages</button>
+      <div id="resultBox"></div>
+    </div>` : ''}
+  `;
+  const dz = document.getElementById('dropZone');
+  const inputId = 'splitInput';
+  if(!document.getElementById(inputId)){
+    const inp = document.createElement('input');
+    inp.type='file'; inp.accept='application/pdf'; inp.id=inputId; inp.style.display='none';
+    document.body.appendChild(inp);
+  }
+  const inp = document.getElementById(inputId);
+  if(dz) dz.addEventListener('click', ()=> inp.click());
+  inp.onchange = async (e) => {
+    const f = e.target.files[0];
+    if(!f) return;
+    const bytes = await f.arrayBuffer();
+    const { PDFDocument } = PDFLib;
+    const doc = await PDFDocument.load(bytes);
+    state.splitFile = f;
+    state.splitBytes = bytes;
+    state.splitPageCount = doc.getPageCount();
+    inp.value = '';
+    render();
+  };
+  const clearBtn = document.getElementById('clearSplit');
+  if(clearBtn) clearBtn.addEventListener('click', ()=>{
+    state.splitFile = null; state.splitBytes = null; state.splitPageCount = null;
+    render();
+  });
+  const runBtn = document.getElementById('runBtn');
+  if(runBtn) runBtn.addEventListener('click', async ()=>{
+    runBtn.disabled = true; runBtn.textContent = 'Extracting…';
+    const from = Math.max(1, parseInt(document.getElementById('pFrom').value)||1);
+    const to = Math.min(state.splitPageCount, parseInt(document.getElementById('pTo').value)||state.splitPageCount);
+    const { PDFDocument } = PDFLib;
+    const src = await PDFDocument.load(state.splitBytes);
+    const out = await PDFDocument.create();
+    const indices = [];
+    for(let i=from-1;i<=to-1;i++) indices.push(i);
+    const pages = await out.copyPages(src, indices);
+    pages.forEach(p=>out.addPage(p));
+    const bytes = await out.save();
+    const blob = new Blob([bytes], {type:'application/pdf'});
+    const url = URL.createObjectURL(blob);
+    document.getElementById('resultBox').innerHTML = `
+      <div class="result">
+        <div class="info">Pages ${from}–${to} · ${fmtSize(blob.size)}</div>
+        <a href="${url}" download="extracted.pdf">Save</a>
+      </div>`;
+    runBtn.disabled = false; runBtn.textContent = 'Extract pages';
+  });
+}
+
+// ---------------- PDF.js setup ----------------
+if(window.pdfjsLib){
+  pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+}
+
+// ---------------- EDIT PDF (reorder / delete / rotate / add text) ----------------
+async function loadEditPages(bytes){
+  const pdf = await pdfjsLib.getDocument({data: bytes.slice(0)}).promise;
+  const pages = [];
+  for(let i=1;i<=pdf.numPages;i++){
+    const page = await pdf.getPage(i);
+    const viewport = page.getViewport({scale: 0.4});
+    const c = document.createElement('canvas');
+    c.width = viewport.width; c.height = viewport.height;
+    await page.render({canvasContext: c.getContext('2d'), viewport}).promise;
+    const thumbUrl = c.toDataURL('image/png');
+    pages.push({index:i-1, rotation:0, deleted:false, thumbUrl});
+  }
+  return pages;
+}
+
+function renderEditPdf(){
+  app.innerHTML = `
+    <div class="card">
+      <h2>PDF file</h2>
+      ${state.editFile ? `
+        <div class="preview">
+          <div class="meta"><div class="name">${state.editFile.name}</div><div class="size">${fmtSize(state.editFile.size)} · ${state.editPages.length} pages</div></div>
+          <button class="clear" id="clearEdit">✕</button>
+        </div>
+      ` : pdfDropZoneHTML('Choose one PDF to edit')}
+    </div>
+    ${state.editFile && state.editPages.length ? `
+    <div class="card">
+      <h2>Pages — tap to rotate, ✕ to remove, use arrows to reorder</h2>
+      <div id="pageGrid" style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;"></div>
+    </div>
+    <div class="card">
+      <h2>Add text to a page (optional)</h2>
+      <div class="row">
+        <input type="text" id="stampText" placeholder="e.g. PAID / DRAFT" />
+        <input type="number" id="stampPage" placeholder="Page #" min="1" max="${state.editPages.length}" style="max-width:90px" />
+      </div>
+      <div class="hint">Adds this text near the top of the chosen page number.</div>
+    </div>
+    <div class="card">
+      <button class="btn" id="runBtn">Export edited PDF</button>
+      <div id="resultBox"></div>
+    </div>` : ''}
+  `;
+  const dz = document.getElementById('dropZone');
+  const inputId = 'editInput';
+  if(!document.getElementById(inputId)){
+    const inp = document.createElement('input');
+    inp.type='file'; inp.accept='application/pdf'; inp.id=inputId; inp.style.display='none';
+    document.body.appendChild(inp);
+  }
+  const inp = document.getElementById(inputId);
+  if(dz) dz.addEventListener('click', ()=> inp.click());
+  inp.onchange = async (e) => {
+    const f = e.target.files[0];
+    if(!f) return;
+    const bytes = new Uint8Array(await f.arrayBuffer());
+    state.editFile = f;
+    state.editBytes = bytes;
+    app.innerHTML = `<div class="card"><h2>PDF file</h2><div class="hint">Loading pages…</div></div>`;
+    state.editPages = await loadEditPages(bytes);
+    inp.value = '';
+    render();
+  };
+  const clearBtn = document.getElementById('clearEdit');
+  if(clearBtn) clearBtn.addEventListener('click', ()=>{
+    state.editFile = null; state.editBytes = null; state.editPages = [];
+    render();
+  });
+
+  const grid = document.getElementById('pageGrid');
+  if(grid){
+    function drawGrid(){
+      grid.innerHTML = state.editPages.map((p, i) => p.deleted ? '' : `
+        <div style="text-align:center">
+          <img data-i="${i}" class="pgThumb" src="${p.thumbUrl}" style="width:100%;border-radius:8px;border:1px solid var(--line);transform:rotate(${p.rotation}deg);cursor:pointer;background:#fff" />
+          <div style="font-size:10px;color:var(--muted);margin-top:3px">Page ${i+1}
+            <button data-up="${i}" style="background:none;border:none;color:var(--muted);cursor:pointer">↑</button>
+            <button data-down="${i}" style="background:none;border:none;color:var(--muted);cursor:pointer">↓</button>
+            <button data-del="${i}" style="background:none;border:none;color:var(--safelight);cursor:pointer">✕</button>
+          </div>
+        </div>`).join('');
+      grid.querySelectorAll('.pgThumb').forEach(img=>{
+        img.addEventListener('click', ()=>{
+          const i = parseInt(img.dataset.i);
+          state.editPages[i].rotation = (state.editPages[i].rotation+90)%360;
+          drawGrid();
+        });
+      });
+      grid.querySelectorAll('[data-del]').forEach(btn=>{
+        btn.addEventListener('click', ()=>{
+          state.editPages[parseInt(btn.dataset.del)].deleted = true;
+          drawGrid();
+        });
+      });
+      grid.querySelectorAll('[data-up]').forEach(btn=>{
+        btn.addEventListener('click', ()=>{
+          const i = parseInt(btn.dataset.up);
+          if(i>0){ [state.editPages[i-1], state.editPages[i]] = [state.editPages[i], state.editPages[i-1]]; drawGrid(); }
+        });
+      });
+      grid.querySelectorAll('[data-down]').forEach(btn=>{
+        btn.addEventListener('click', ()=>{
+          const i = parseInt(btn.dataset.down);
+          if(i<state.editPages.length-1){ [state.editPages[i+1], state.editPages[i]] = [state.editPages[i], state.editPages[i+1]]; drawGrid(); }
+        });
+      });
+    }
+    drawGrid();
+  }
+
+  const runBtn = document.getElementById('runBtn');
+  if(runBtn) runBtn.addEventListener('click', async ()=>{
+    runBtn.disabled = true; runBtn.textContent = 'Exporting…';
+    const { PDFDocument, degrees, rgb, StandardFonts } = PDFLib;
+    const src = await PDFDocument.load(state.editBytes);
+    const out = await PDFDocument.create();
+    const font = await out.embedFont(StandardFonts.HelveticaBold);
+    const kept = state.editPages.filter(p=>!p.deleted);
+    for(const p of kept){
+      const [copied] = await out.copyPages(src, [p.index]);
+      if(p.rotation) copied.setRotation(degrees((copied.getRotation().angle||0) + p.rotation));
+      out.addPage(copied);
+    }
+    const stampText = document.getElementById('stampText').value.trim();
+    const stampPageNum = parseInt(document.getElementById('stampPage').value);
+    if(stampText && stampPageNum >=1 && stampPageNum <= kept.length){
+      const page = out.getPages()[stampPageNum-1];
+      const { width, height } = page.getSize();
+      page.drawText(stampText, { x: 24, y: height-40, size: 20, font, color: rgb(0.89,0.33,0.23) });
+    }
+    const bytes = await out.save();
+    const blob = new Blob([bytes], {type:'application/pdf'});
+    const url = URL.createObjectURL(blob);
+    document.getElementById('resultBox').innerHTML = `
+      <div class="result"><div class="info">Edited PDF · ${fmtSize(blob.size)}</div><a href="${url}" download="edited.pdf">Save</a></div>`;
+    runBtn.disabled = false; runBtn.textContent = 'Export edited PDF';
+  });
+}
+
+// ---------------- DOCX -> PDF ----------------
+function renderDocxToPdf(){
+  app.innerHTML = `
+    <div class="card">
+      <h2>Word file (.docx)</h2>
+      ${state.docxFile ? `
+        <div class="preview"><div class="meta"><div class="name">${state.docxFile.name}</div><div class="size">${fmtSize(state.docxFile.size)}</div></div>
+        <button class="clear" id="clearDocx">✕</button></div>
+      ` : `<div class="drop" id="dropZone"><b>Tap to choose a .docx file</b><br/>Word documents only</div>`}
+      <div class="warn">Text, headings, and basic formatting carry over. Complex layouts (multi-column, text boxes, tracked changes) may not.</div>
+    </div>
+    ${state.docxFile ? `
+    <div class="card">
+      <button class="btn" id="runBtn">Convert to PDF</button>
+      <div id="resultBox"></div>
+    </div>` : ''}
+    <div id="docxRender" style="position:fixed;left:-9999px;top:0;width:700px;background:#fff;color:#000;padding:32px;"></div>
+  `;
+  const dz = document.getElementById('dropZone');
+  const inputId = 'docxInput';
+  if(!document.getElementById(inputId)){
+    const inp = document.createElement('input');
+    inp.type='file'; inp.accept='.docx'; inp.id=inputId; inp.style.display='none';
+    document.body.appendChild(inp);
+  }
+  const inp = document.getElementById(inputId);
+  if(dz) dz.addEventListener('click', ()=> inp.click());
+  inp.onchange = (e) => {
+    const f = e.target.files[0];
+    if(f){ state.docxFile = f; }
+    inp.value=''; render();
+  };
+  const clearBtn = document.getElementById('clearDocx');
+  if(clearBtn) clearBtn.addEventListener('click', ()=>{ state.docxFile=null; render(); });
+
+  const runBtn = document.getElementById('runBtn');
+  if(runBtn) runBtn.addEventListener('click', async ()=>{
+    runBtn.disabled = true; runBtn.textContent = 'Converting…';
+    const arrayBuffer = await state.docxFile.arrayBuffer();
+    const result = await mammoth.convertToHtml({arrayBuffer});
+    const holder = document.getElementById('docxRender');
+    holder.innerHTML = `<div style="font-family:Georgia,serif;font-size:14px;line-height:1.5">${result.value}</div>`;
+    const { jsPDF } = window.jspdf;
+    const pdf = new jsPDF({unit:'pt', format:'a4'});
+    await pdf.html(holder, {
+      x: 20, y: 20,
+      width: 555,
+      windowWidth: 700,
+      html2canvas: { scale: 0.8 },
+    });
+    setTimeout(()=>{
+      const blob = pdf.output('blob');
+      const url = URL.createObjectURL(blob);
+      document.getElementById('resultBox').innerHTML = `
+        <div class="result"><div class="info">Converted PDF · ${fmtSize(blob.size)}</div><a href="${url}" download="converted.pdf">Save</a></div>`;
+      runBtn.disabled = false; runBtn.textContent = 'Convert to PDF';
+    }, 600);
+  });
+}
+
+// ---------------- PDF -> DOCX (text only) ----------------
+async function extractPdfPages(bytes){
+  const pdf = await pdfjsLib.getDocument({data: bytes.slice(0)}).promise;
+  const pages = [];
+  for(let i=1;i<=pdf.numPages;i++){
+    const page = await pdf.getPage(i);
+    const content = await page.getTextContent();
+    pages.push(content.items);
+  }
+  return pages;
+}
+function renderPdfToDocx(){
+  app.innerHTML = `
+    <div class="card">
+      <h2>PDF file</h2>
+      ${state.pdfToConvertFile ? `
+        <div class="preview"><div class="meta"><div class="name">${state.pdfToConvertFile.name}</div><div class="size">${fmtSize(state.pdfToConvertFile.size)}</div></div>
+        <button class="clear" id="clearP2D">✕</button></div>
+      ` : pdfDropZoneHTML('Choose one PDF')}
+      <div class="warn">Text-only conversion: words come out as an editable .docx, but original layout, images, and tables are not recreated.</div>
+    </div>
+    ${state.pdfToConvertFile ? `
+    <div class="card">
+      <button class="btn" id="runBtn">Convert to DOCX</button>
+      <div id="resultBox"></div>
+    </div>` : ''}
+  `;
+  const dz = document.getElementById('dropZone');
+  const inputId = 'p2dInput';
+  if(!document.getElementById(inputId)){
+    const inp = document.createElement('input');
+    inp.type='file'; inp.accept='application/pdf'; inp.id=inputId; inp.style.display='none';
+    document.body.appendChild(inp);
+  }
+  const inp = document.getElementById(inputId);
+  if(dz) dz.addEventListener('click', ()=> inp.click());
+  inp.onchange = async (e) => {
+    const f = e.target.files[0];
+    if(!f) return;
+    state.pdfToConvertFile = f;
+    state.pdfToConvertBytes = new Uint8Array(await f.arrayBuffer());
+    inp.value=''; render();
+  };
+  const clearBtn = document.getElementById('clearP2D');
+  if(clearBtn) clearBtn.addEventListener('click', ()=>{ state.pdfToConvertFile=null; state.pdfToConvertBytes=null; render(); });
+
+  const runBtn = document.getElementById('runBtn');
+  if(runBtn) runBtn.addEventListener('click', async ()=>{
+    runBtn.disabled = true; runBtn.textContent = 'Converting…';
+    const pages = await extractPdfPages(state.pdfToConvertBytes);
+    const { Document, Packer, Paragraph, TextRun } = docx;
+    const children = [];
+    pages.forEach((items, pIdx)=>{
+      let line = '';
+      let lastY = null;
+      items.forEach(it=>{
+        if(lastY !== null && Math.abs(it.transform[5]-lastY) > 3){
+          children.push(new Paragraph({children:[new TextRun(line)]}));
+          line = '';
+        }
+        line += it.str + ' ';
+        lastY = it.transform[5];
+      });
+      if(line.trim()) children.push(new Paragraph({children:[new TextRun(line)]}));
+      if(pIdx < pages.length-1) children.push(new Paragraph({children:[new TextRun('')], pageBreakBefore:true}));
+    });
+    const doc = new Document({sections:[{children}]});
+    const blob = await Packer.toBlob(doc);
+    const url = URL.createObjectURL(blob);
+    document.getElementById('resultBox').innerHTML = `
+      <div class="result"><div class="info">Converted DOCX · ${fmtSize(blob.size)}</div><a href="${url}" download="converted.docx">Save</a></div>`;
+    runBtn.disabled = false; runBtn.textContent = 'Convert to DOCX';
+  });
+}
+
+// ---------------- PDF -> Excel (text/table extraction) ----------------
+function renderPdfToExcel(){
+  app.innerHTML = `
+    <div class="card">
+      <h2>PDF file</h2>
+      ${state.pdfToConvertFile ? `
+        <div class="preview"><div class="meta"><div class="name">${state.pdfToConvertFile.name}</div><div class="size">${fmtSize(state.pdfToConvertFile.size)}</div></div>
+        <button class="clear" id="clearP2X">✕</button></div>
+      ` : pdfDropZoneHTML('Choose one PDF')}
+      <div class="warn">Extracts text and groups it into rows/columns by position on the page. Works well for simple tables; complex or merged-cell tables may come out approximate.</div>
+    </div>
+    ${state.pdfToConvertFile ? `
+    <div class="card">
+      <button class="btn" id="runBtn">Convert to Excel (.xlsx)</button>
+      <div id="resultBox"></div>
+    </div>` : ''}
+  `;
+  const dz = document.getElementById('dropZone');
+  const inputId = 'p2xInput';
+  if(!document.getElementById(inputId)){
+    const inp = document.createElement('input');
+    inp.type='file'; inp.accept='application/pdf'; inp.id=inputId; inp.style.display='none';
+    document.body.appendChild(inp);
+  }
+  const inp = document.getElementById(inputId);
+  if(dz) dz.addEventListener('click', ()=> inp.click());
+  inp.onchange = async (e) => {
+    const f = e.target.files[0];
+    if(!f) return;
+    state.pdfToConvertFile = f;
+    state.pdfToConvertBytes = new Uint8Array(await f.arrayBuffer());
+    inp.value=''; render();
+  };
+  const clearBtn = document.getElementById('clearP2X');
+  if(clearBtn) clearBtn.addEventListener('click', ()=>{ state.pdfToConvertFile=null; state.pdfToConvertBytes=null; render(); });
+
+  const runBtn = document.getElementById('runBtn');
+  if(runBtn) runBtn.addEventListener('click', async ()=>{
+    runBtn.disabled = true; runBtn.textContent = 'Converting…';
+    const pages = await extractPdfPages(state.pdfToConvertBytes);
+    const wb = XLSX.utils.book_new();
+    pages.forEach((items, pIdx)=>{
+      const rows = [];
+      let currentY = null, currentRow = [];
+      const sorted = [...items].sort((a,b)=> b.transform[5]-a.transform[5] || a.transform[4]-b.transform[4]);
+      sorted.forEach(it=>{
+        const y = Math.round(it.transform[5]);
+        if(currentY === null || Math.abs(y-currentY) > 4){
+          if(currentRow.length) rows.push(currentRow);
+          currentRow = [];
+          currentY = y;
+        }
+        currentRow.push(it.str);
+      });
+      if(currentRow.length) rows.push(currentRow);
+      const ws = XLSX.utils.aoa_to_sheet(rows);
+      XLSX.utils.book_append_sheet(wb, ws, `Page ${pIdx+1}`);
+    });
+    const wbout = XLSX.write(wb, {bookType:'xlsx', type:'array'});
+    const blob = new Blob([wbout], {type:'application/octet-stream'});
+    const url = URL.createObjectURL(blob);
+    document.getElementById('resultBox').innerHTML = `
+      <div class="result"><div class="info">Converted XLSX · ${fmtSize(blob.size)}</div><a href="${url}" download="converted.xlsx">Save</a></div>`;
+    runBtn.disabled = false; runBtn.textContent = 'Convert to Excel (.xlsx)';
+  });
+}
+
+// ---------------- PASSPORT PHOTO ----------------
+// Exact list as published at https://makepassportphoto.com/en/p/country/india
+// Note: entries labeled "51x51 mm" are displayed rounded on the site, but its own 1200x1200px
+// @600dpi output for these works out to precisely 50.8mm (true 2x2in) — using that exact value
+// for layout math (dispW/dispH keep the site's rounded "51" for what's shown on screen).
+const DOC_SIZES = {
+  'india-visa': {group:'India', label:'Visa', unit:'mm', w:50.8, h:50.8, dispW:51, dispH:51},
+  'india-unofficial-passport': {group:'India', label:'Unofficial Passport Photo', unit:'mm', w:35, h:45},
+  'india-visa-online': {group:'India', label:'Visa Online', unit:'px', w:350, h:350},
+  'india-stamp-size': {group:'India', label:'Stamp Size Photo', unit:'mm', w:20, h:25},
+  'india-oci-passport': {group:'India', label:'OCI Passport', unit:'mm', w:50.8, h:50.8, dispW:51, dispH:51},
+  'india-passport': {group:'India', label:'Passport', unit:'mm', w:50.8, h:50.8, dispW:51, dispH:51},
+  'india-passport-thailand': {group:'India', label:'Passport (from Thailand)', unit:'mm', w:35, h:35},
+  'india-pan-card': {group:'India', label:'Pan card', unit:'mm', w:25, h:35},
+  'india-pan-card-online': {group:'India', label:'Pan card online', unit:'px', w:213, h:213},
+  'india-online-driving-licence': {group:'India', label:'Online driving licence', unit:'px', w:420, h:525},
+  'india-driving-licence': {group:'India', label:'Driving licence', unit:'mm', w:35, h:45},
+  'india-pio': {group:'India', label:'PIO (Person of Indian Origin)', unit:'mm', w:35, h:35},
+  'india-pcc-birth-cert': {group:'India', label:'PCC / Birth Certificate', unit:'mm', w:35, h:35},
+  'india-frro': {group:'India', label:'FRRO (Foreigner Registration)', unit:'mm', w:35, h:35},
+  'india-passport-bls-usa': {group:'India', label:'Passport for BLS USA Application', unit:'mm', w:50.8, h:50.8, dispW:51, dispH:51},
+  'india-pcc': {group:'India', label:'Police clearance certificate (PCC)', unit:'mm', w:50.8, h:50.8, dispW:51, dispH:51},
+  'india-neet-25x35in': {group:'India', label:'NEET Passport photo 2.5×3.5 Inch', unit:'mm', w:63.5, h:89},
+  'india-neet-postcard': {group:'India', label:'NEET Post card photo 4.25×6.5 Inch', unit:'mm', w:108, h:165},
+  'india-upsc': {group:'India', label:'Photo for UPSC exam', unit:'px', w:110, h:140},
+  'india-passport-online': {group:'India', label:'passport online', unit:'px', w:630, h:810},
+  'custom': {group:'Other', label:'Custom size', unit:'mm', w:35, h:45},
+};
+const MM_DPI = 600; // matches the source site's mm→pixel conversion (e.g. 50.8mm → 1200px)
+
+const PAPER_SIZES = {
+  '4x6': {label:'4×6 in', w:101.6, h:152.4},
+  '5x7': {label:'5×7 in', w:127, h:178},
+  'a4': {label:'A4', w:210, h:297},
+  'letter': {label:'Letter', w:215.9, h:279.4},
+};
+
+function renderPassport(){
+  const doc = DOC_SIZES[state.passportDocKey];
+  const groups = [...new Set(Object.values(DOC_SIZES).map(v=>v.group))];
+  app.innerHTML = `
+    <div class="card">
+      <h2>Photo</h2>
+      ${state.passportFile ? previewHTML(state.passportFile) : dropZoneHTML('A clear, front-facing photo works best')}
+    </div>
+    <div class="card">
+      <h2>Country / document type</h2>
+      <select id="docSelect">
+        ${groups.map(g => `
+          <optgroup label="${g}">
+            ${Object.entries(DOC_SIZES).filter(([k,v])=>v.group===g).map(([k,v])=>
+              `<option value="${k}" ${k===state.passportDocKey?'selected':''}>${v.label} (${v.dispW||v.w}×${v.dispH||v.h}${v.unit==='px'?'px':'mm'})</option>`
+            ).join('')}
+          </optgroup>`).join('')}
+      </select>
+      ${state.passportDocKey==='custom' ? `
+      <div class="row" style="margin-top:8px">
+        <div><label class="field">Width (mm)</label><input type="number" id="customW" value="${doc.w}"></div>
+        <div><label class="field">Height (mm)</label><input type="number" id="customH" value="${doc.h}"></div>
+      </div>` : ''}
+      <div class="hint">Sizes and pixel dimensions above are copied directly from makepassportphoto.com's published India document list — always confirm against the official requirements for your specific document before submitting.</div>
+    </div>
+    ${state.passportFile ? `
+    <div class="card">
+      <h2>Position &amp; zoom</h2>
+      <div id="cropStage" style="position:relative;overflow:hidden;background:#000;border-radius:10px;margin:0 auto;touch-action:none;"></div>
+      <div class="chips" style="margin-top:10px">
+        <div class="chip" id="rotLeft">↺ Rotate left</div>
+        <div class="chip" id="rotRight">Rotate right ↻</div>
+      </div>
+      <input type="range" id="zoomSlider" min="1" max="3" step="0.01" value="${state.passportZoom}" style="width:100%;margin-top:12px" />
+      <div class="hint">Drag the photo to position your face. Use the slider to zoom, or rotate first if the photo was taken sideways. Align eyes roughly on the upper guideline and chin near the lower one.</div>
+      <button class="btn" id="exportBtn">Export photo</button>
+      <div id="resultBox"></div>
+    </div>
+    <div class="card" id="sheetCard" style="display:${state.passportResultUrl?'block':'none'}">
+      <h2>Print sheet (multiple copies)</h2>
+      <label class="field">Paper size</label>
+      <select id="paperSelect">
+        ${Object.entries(PAPER_SIZES).map(([k,v])=>`<option value="${k}">${v.label}</option>`).join('')}
+      </select>
+      <button class="btn secondary" id="sheetBtn">Build print sheet</button>
+      <div id="sheetResultBox"></div>
+    </div>` : ''}
+  `;
+  wireDropZone((f)=>{
+    state.passportFile = f;
+    loadFileInto(f, (img, url)=>{
+      state.passportImg = img; state.passportObjectUrl = url;
+      state.passportZoom = 1; state.passportOffX = 0; state.passportOffY = 0;
+      state.passportResultUrl = null;
+      render();
+    });
+  });
+  const clearBtn = document.getElementById('clearFile');
+  if(clearBtn) clearBtn.addEventListener('click', ()=>{
+    state.passportFile=null; state.passportImg=null; state.passportResultUrl=null; render();
+  });
+
+  const docSel = document.getElementById('docSelect');
+  if(docSel) docSel.addEventListener('change', ()=>{ state.passportDocKey = docSel.value; render(); });
+  const cw = document.getElementById('customW'), chh = document.getElementById('customH');
+  if(cw) cw.addEventListener('input', ()=>{ DOC_SIZES.custom.w = parseFloat(cw.value)||35; });
+  if(chh) chh.addEventListener('input', ()=>{ DOC_SIZES.custom.h = parseFloat(chh.value)||45; });
+
+  if(state.passportFile && state.passportImg){
+    setupCropStage(doc);
+  }
+
+  const sheetBtn = document.getElementById('sheetBtn');
+  if(sheetBtn) sheetBtn.addEventListener('click', buildPrintSheet);
+}
+
+function setupCropStage(doc){
+  const stage = document.getElementById('cropStage');
+  const stageW = Math.min(300, window.innerWidth - 64);
+  const aspect = doc.w / doc.h;
+  const stageH = stageW / aspect;
+  stage.style.width = stageW + 'px';
+  stage.style.height = stageH + 'px';
+
+  const iw = state.passportImg.naturalWidth, ih = state.passportImg.naturalHeight;
+  const baseScale = Math.max(stageW/iw, stageH/ih);
+
+  const img = document.createElement('img');
+  img.src = state.passportObjectUrl;
+  img.style.position = 'absolute';
+  img.style.left = '0'; img.style.top = '0';
+  img.style.transformOrigin = 'top left';
+  stage.innerHTML = '';
+  stage.appendChild(img);
+
+  const guide = document.createElement('div');
+  guide.style.position = 'absolute'; guide.style.inset = '0'; guide.style.pointerEvents = 'none';
+  // Oval sized in real pixels, always proportioned like a face (taller than wide) —
+  // no longer tied separately to container width vs height, so it can't get squashed
+  // sideways on documents whose aspect ratio is wider/shorter than a typical portrait.
+  const headZoneTop = 0.32*stageH, headZoneBottom = 0.88*stageH;
+  const ovalH = (headZoneBottom-headZoneTop) * 0.95;
+  const ovalW = ovalH * 0.74; // typical face width:height ratio
+  const ovalCx = stageW/2, ovalCy = (headZoneTop+headZoneBottom)/2;
+  guide.innerHTML = `
+    <div style="position:absolute;left:0;right:0;top:${headZoneTop}px;border-top:1px dashed rgba(226,84,58,.8)"></div>
+    <div style="position:absolute;left:0;right:0;top:${headZoneBottom}px;border-top:1px dashed rgba(226,84,58,.8)"></div>
+    <div style="position:absolute;left:${ovalCx}px;top:${ovalCy}px;width:${ovalW}px;height:${ovalH}px;transform:translate(-50%,-50%);border:1.5px solid rgba(255,255,255,.55);border-radius:50%"></div>
+  `;
+  stage.appendChild(guide);
+
+  function applyTransform(){
+    const scale = baseScale * state.passportZoom;
+    img.style.width = iw + 'px';
+    img.style.height = ih + 'px';
+    const maxOffX = 0, minOffX = stageW - iw*scale;
+    const maxOffY = 0, minOffY = stageH - ih*scale;
+    state.passportOffX = Math.min(maxOffX, Math.max(minOffX, state.passportOffX));
+    state.passportOffY = Math.min(maxOffY, Math.max(minOffY, state.passportOffY));
+    img.style.transform = `translate(${state.passportOffX}px, ${state.passportOffY}px) scale(${scale})`;
+  }
+  if(state.passportOffX===0 && state.passportOffY===0){
+    state.passportOffX = (stageW - iw*baseScale)/2;
+    state.passportOffY = (stageH - ih*baseScale)/2;
+  }
+  applyTransform();
+
+  let dragging = false, startX, startY, startOffX, startOffY;
+  stage.addEventListener('pointerdown', (e)=>{
+    dragging = true; startX = e.clientX; startY = e.clientY;
+    startOffX = state.passportOffX; startOffY = state.passportOffY;
+    stage.setPointerCapture(e.pointerId);
+  });
+  stage.addEventListener('pointermove', (e)=>{
+    if(!dragging) return;
+    state.passportOffX = startOffX + (e.clientX-startX);
+    state.passportOffY = startOffY + (e.clientY-startY);
+    applyTransform();
+  });
+  stage.addEventListener('pointerup', ()=>{ dragging = false; });
+  stage.addEventListener('pointercancel', ()=>{ dragging = false; });
+
+  const zoomSlider = document.getElementById('zoomSlider');
+  zoomSlider.addEventListener('input', ()=>{
+    state.passportZoom = parseFloat(zoomSlider.value);
+    applyTransform();
+  });
+
+  function rotateWorkingImage(deg){
+    const srcW = state.passportImg.naturalWidth, srcH = state.passportImg.naturalHeight;
+    const rc = document.createElement('canvas');
+    rc.width = srcH; rc.height = srcW; // 90-degree rotation swaps bounding box
+    const rctx = rc.getContext('2d');
+    rctx.translate(rc.width/2, rc.height/2);
+    rctx.rotate(deg*Math.PI/180);
+    rctx.drawImage(state.passportImg, -srcW/2, -srcH/2);
+    rc.toBlob((blob)=>{
+      const url = URL.createObjectURL(blob);
+      const newImg = new Image();
+      newImg.onload = () => {
+        if(state.passportObjectUrl) URL.revokeObjectURL(state.passportObjectUrl);
+        state.passportImg = newImg;
+        state.passportObjectUrl = url;
+        state.passportZoom = 1; state.passportOffX = 0; state.passportOffY = 0;
+        render();
+      };
+      newImg.src = url;
+    }, 'image/png');
+  }
+  const rotLeft = document.getElementById('rotLeft');
+  const rotRight = document.getElementById('rotRight');
+  if(rotLeft) rotLeft.addEventListener('click', ()=> rotateWorkingImage(-90));
+  if(rotRight) rotRight.addEventListener('click', ()=> rotateWorkingImage(90));
+
+  const exportBtn = document.getElementById('exportBtn');
+  exportBtn.addEventListener('click', ()=>{
+    const Tw = doc.unit==='px' ? Math.round(doc.w) : Math.round(doc.w/25.4*MM_DPI);
+    const Th = doc.unit==='px' ? Math.round(doc.h) : Math.round(doc.h/25.4*MM_DPI);
+    const ratio = Tw/stageW;
+    const scale = baseScale * state.passportZoom * ratio;
+    canvas.width = Tw; canvas.height = Th;
+    ctx.fillStyle = '#fff'; ctx.fillRect(0,0,Tw,Th);
+    ctx.drawImage(state.passportImg, state.passportOffX*ratio, state.passportOffY*ratio, iw*scale, ih*scale);
+    canvas.toBlob((blob)=>{
+      const url = URL.createObjectURL(blob);
+      state.passportResultUrl = url;
+      state.passportResultW = Tw; state.passportResultH = Th;
+      state.passportResultDocKey = state.passportDocKey;
+      const sizeLabel = doc.unit==='px' ? `${Tw}×${Th}px (fixed size)` : `${Tw}×${Th}px (${doc.w}×${doc.h}mm @${MM_DPI}dpi)`;
+      document.getElementById('resultBox').innerHTML = `
+        <div class="result">
+          <img src="${url}"/>
+          <div class="info">${sizeLabel} · ${fmtSize(blob.size)}</div>
+          <a href="${url}" download="passport-photo.jpg">Save</a>
+        </div>`;
+      const sheetCard = document.getElementById('sheetCard');
+      if(sheetCard) sheetCard.style.display = 'block';
+    }, 'image/jpeg', 0.95);
+  });
+}
+
+function buildPrintSheet(){
+  if(!state.passportResultUrl) return;
+  const resultBox = document.getElementById('sheetResultBox');
+  const usedDoc = DOC_SIZES[state.passportResultDocKey];
+  if(usedDoc.unit === 'px'){
+    resultBox.innerHTML = `<div class="warn">"${usedDoc.label}" is a fixed-pixel digital upload photo with no defined print size — it's meant for online submission, not a physical print sheet. Choose a mm-based document type (e.g. Passport, Visa, Pan card) to build a print sheet.</div>`;
+    return;
+  }
+  const paperKey = document.getElementById('paperSelect').value;
+  const paper = PAPER_SIZES[paperKey];
+  const SHEET_DPI = 300;
+  const sheetW = Math.round(paper.w/25.4*SHEET_DPI);
+  const sheetH = Math.round(paper.h/25.4*SHEET_DPI);
+  // Photo size on the sheet is derived from its real physical mm size at the SAME dpi as the sheet —
+  // not from the source photo's own pixel resolution — so the two always line up correctly.
+  const photoW0 = Math.round(usedDoc.w/25.4*SHEET_DPI);
+  const photoH0 = Math.round(usedDoc.h/25.4*SHEET_DPI);
+
+  // Leave real white space between photos (and around the sheet edge) rather than tiling
+  // edge-to-edge — matches a standard print-shop layout you can cut cleanly by hand.
+  const gap = Math.round(2/25.4*SHEET_DPI);    // ~2mm between photos
+  const margin = Math.round(3/25.4*SHEET_DPI); // ~3mm outer border
+
+  function fitCount(pw, ph){
+    const cols = Math.max(1, Math.floor((sheetW - margin*2 + gap) / (pw + gap)));
+    const rows = Math.max(1, Math.floor((sheetH - margin*2 + gap) / (ph + gap)));
+    return {cols, rows, total: cols*rows};
+  }
+  // Try photos upright, and rotated 90° on their side — whichever packs more onto the sheet wins.
+  const upright = fitCount(photoW0, photoH0);
+  const rotated = fitCount(photoH0, photoW0);
+  const useRotated = rotated.total > upright.total;
+  const {cols, rows} = useRotated ? rotated : upright;
+  const photoW = useRotated ? photoH0 : photoW0;
+  const photoH = useRotated ? photoW0 : photoH0;
+  const gridW = cols*photoW + (cols-1)*gap;
+  const gridH = rows*photoH + (rows-1)*gap;
+  const startX = Math.max(0, (sheetW-gridW)/2), startY = Math.max(0, (sheetH-gridH)/2);
+
+  const img = new Image();
+  img.onload = () => {
+    canvas.width = sheetW; canvas.height = sheetH;
+    ctx.fillStyle = '#fff'; ctx.fillRect(0,0,sheetW,sheetH);
+
+    ctx.strokeStyle = '#ccc'; ctx.lineWidth = 1;
+    for(let r=0;r<rows;r++){
+      for(let c=0;c<cols;c++){
+        const x = startX + c*(photoW+gap), y = startY + r*(photoH+gap);
+        if(useRotated){
+          ctx.save();
+          ctx.translate(x+photoW/2, y+photoH/2);
+          ctx.rotate(Math.PI/2);
+          ctx.drawImage(img, -photoH/2, -photoW/2, photoH, photoW);
+          ctx.restore();
+        } else {
+          ctx.drawImage(img, x, y, photoW, photoH);
+        }
+        ctx.strokeRect(x+0.5, y+0.5, photoW-1, photoH-1);
+      }
+    }
+    canvas.toBlob((blob)=>{
+      const url = URL.createObjectURL(blob);
+      resultBox.innerHTML = `
+        <div class="result">
+          <div class="info">${cols*rows} copies (${cols}×${rows}${useRotated?', rotated to fit more per sheet':''}) on ${paper.label}, at true ${usedDoc.w}×${usedDoc.h}mm size · ${fmtSize(blob.size)}</div>
+          <a href="${url}" download="passport-sheet.jpg">Save</a>
+        </div>`;
+    }, 'image/jpeg', 0.95);
+  };
+  img.src = state.passportResultUrl;
+}
+
+// ---------------- PDF -> IMAGES ----------------
+function renderPdfToImages(){
+  app.innerHTML = `
+    <div class="card">
+      <h2>PDF file</h2>
+      ${state.pdfImagesFile ? `
+        <div class="preview"><div class="meta"><div class="name">${state.pdfImagesFile.name}</div><div class="size">${fmtSize(state.pdfImagesFile.size)}</div></div>
+        <button class="clear" id="clearP2I">✕</button></div>
+      ` : pdfDropZoneHTML('Choose one PDF to export as images')}
+    </div>
+    ${state.pdfImagesFile ? `
+    <div class="card">
+      <h2>Format</h2>
+      <div class="chips" id="p2iFmt">
+        <div class="chip active" data-fmt="jpg">JPG</div>
+        <div class="chip" data-fmt="png">PNG</div>
+      </div>
+      <button class="btn" id="runBtn">Convert every page to an image</button>
+      <div class="hint">Each page downloads separately below — tap Save on each one you want.</div>
+      <div id="resultBox" style="margin-top:10px"></div>
+    </div>` : ''}
+  `;
+  const dz = document.getElementById('dropZone');
+  const inputId = 'p2iInput';
+  if(!document.getElementById(inputId)){
+    const inp = document.createElement('input');
+    inp.type='file'; inp.accept='application/pdf'; inp.id=inputId; inp.style.display='none';
+    document.body.appendChild(inp);
+  }
+  const inp = document.getElementById(inputId);
+  if(dz) dz.addEventListener('click', ()=> inp.click());
+  inp.onchange = async (e) => {
+    const f = e.target.files[0];
+    if(!f) return;
+    state.pdfImagesFile = f;
+    state.pdfImagesBytes = new Uint8Array(await f.arrayBuffer());
+    inp.value=''; render();
+  };
+  const clearBtn = document.getElementById('clearP2I');
+  if(clearBtn) clearBtn.addEventListener('click', ()=>{ state.pdfImagesFile=null; state.pdfImagesBytes=null; render(); });
+
+  let fmt = 'jpg';
+  const chips = app.querySelectorAll('#p2iFmt .chip');
+  chips.forEach(c=>c.addEventListener('click', ()=>{
+    chips.forEach(x=>x.classList.remove('active')); c.classList.add('active'); fmt = c.dataset.fmt;
+  }));
+
+  const runBtn = document.getElementById('runBtn');
+  if(runBtn) runBtn.addEventListener('click', async ()=>{
+    runBtn.disabled = true; runBtn.textContent = 'Rendering pages…';
+    const resultBox = document.getElementById('resultBox');
+    resultBox.innerHTML = '';
+    const pdf = await pdfjsLib.getDocument({data: state.pdfImagesBytes.slice(0)}).promise;
+    for(let i=1;i<=pdf.numPages;i++){
+      const page = await pdf.getPage(i);
+      const viewport = page.getViewport({scale: 2});
+      const c = document.createElement('canvas');
+      c.width = viewport.width; c.height = viewport.height;
+      await page.render({canvasContext: c.getContext('2d'), viewport}).promise;
+      const mime = fmt==='png' ? 'image/png' : 'image/jpeg';
+      await new Promise(resolve=>{
+        c.toBlob((blob)=>{
+          const url = URL.createObjectURL(blob);
+          resultBox.insertAdjacentHTML('beforeend', `
+            <div class="result">
+              <img src="${url}"/>
+              <div class="info">Page ${i} · ${fmtSize(blob.size)}</div>
+              <a href="${url}" download="page-${i}.${fmt}">Save</a>
+            </div>`);
+          resolve();
+        }, mime, 0.92);
+      });
+    }
+    runBtn.disabled = false; runBtn.textContent = 'Convert every page to an image';
+  });
+}
+
+// ---------------- COMPRESS PDF ----------------
+function renderCompressPdf(){
+  app.innerHTML = `
+    <div class="card">
+      <h2>PDF file</h2>
+      ${state.compressPdfFile ? `
+        <div class="preview"><div class="meta"><div class="name">${state.compressPdfFile.name}</div><div class="size">${fmtSize(state.compressPdfFile.size)}</div></div>
+        <button class="clear" id="clearCPdf">✕</button></div>
+      ` : pdfDropZoneHTML('Choose one PDF to shrink')}
+      <div class="warn">Works by re-rendering each page as a compressed image and rebuilding the PDF — great for scanned or photo-heavy PDFs. Selectable/searchable text will become a flattened image, so this isn't ideal for text-heavy documents you still need to select or search.</div>
+    </div>
+    ${state.compressPdfFile ? `
+    <div class="card">
+      <h2>Target size</h2>
+      <div class="row">
+        <input type="number" id="targetKb" placeholder="e.g. 200" value="200" />
+        <select id="targetUnit"><option value="kb">KB</option><option value="mb">MB</option></select>
+      </div>
+      <div class="chips">
+        ${[50,100,200,500,1000].map(k=>`<div class="chip" data-kb="${k}">${k}KB</div>`).join('')}
+      </div>
+      <button class="btn" id="runBtn">Compress PDF</button>
+      <div id="resultBox"></div>
+    </div>` : ''}
+  `;
+  const dz = document.getElementById('dropZone');
+  const inputId = 'cpdfInput';
+  if(!document.getElementById(inputId)){
+    const inp = document.createElement('input');
+    inp.type='file'; inp.accept='application/pdf'; inp.id=inputId; inp.style.display='none';
+    document.body.appendChild(inp);
+  }
+  const inp = document.getElementById(inputId);
+  if(dz) dz.addEventListener('click', ()=> inp.click());
+  inp.onchange = async (e) => {
+    const f = e.target.files[0];
+    if(!f) return;
+    state.compressPdfFile = f;
+    state.compressPdfBytes = new Uint8Array(await f.arrayBuffer());
+    inp.value=''; render();
+  };
+  const clearBtn = document.getElementById('clearCPdf');
+  if(clearBtn) clearBtn.addEventListener('click', ()=>{ state.compressPdfFile=null; state.compressPdfBytes=null; render(); });
+
+  app.querySelectorAll('.chip[data-kb]').forEach(c=>c.addEventListener('click', ()=>{
+    document.getElementById('targetKb').value = c.dataset.kb;
+    document.getElementById('targetUnit').value = 'kb';
+    app.querySelectorAll('.chip[data-kb]').forEach(x=>x.classList.remove('active'));
+    c.classList.add('active');
+  }));
+
+  const runBtn = document.getElementById('runBtn');
+  if(runBtn) runBtn.addEventListener('click', async ()=>{
+    runBtn.disabled = true;
+    const kbVal = parseFloat(document.getElementById('targetKb').value)||200;
+    const unit = document.getElementById('targetUnit').value;
+    const targetBytes = unit==='mb' ? kbVal*1024*1024 : kbVal*1024;
+
+    const pdfDoc = await pdfjsLib.getDocument({data: state.compressPdfBytes.slice(0)}).promise;
+    const numPages = pdfDoc.numPages;
+
+    async function buildAtQuality(scale, quality){
+      const { jsPDF } = window.jspdf;
+      let out = null;
+      for(let i=1;i<=numPages;i++){
+        runBtn.textContent = `Rendering page ${i}/${numPages}…`;
+        const page = await pdfDoc.getPage(i);
+        const viewport = page.getViewport({scale});
+        const c = document.createElement('canvas');
+        c.width = viewport.width; c.height = viewport.height;
+        await page.render({canvasContext: c.getContext('2d'), viewport}).promise;
+        const imgData = c.toDataURL('image/jpeg', quality);
+        const wPt = viewport.width * 72/96, hPt = viewport.height * 72/96;
+        if(!out) out = new jsPDF({unit:'pt', format:[wPt,hPt]});
+        else out.addPage([wPt,hPt]);
+        out.addImage(imgData, 'JPEG', 0, 0, wPt, hPt);
+      }
+      return out.output('blob');
+    }
+
+    let scale = 1.5, quality = 0.75, blob = await buildAtQuality(scale, quality);
+    let attempts = 0;
+    while(blob.size > targetBytes && attempts < 5){
+      if(quality > 0.35) quality -= 0.15;
+      else scale = Math.max(0.6, scale - 0.3);
+      blob = await buildAtQuality(scale, quality);
+      attempts++;
+    }
+
+    const url = URL.createObjectURL(blob);
+    document.getElementById('resultBox').innerHTML = `
+      <div class="result">
+        <div class="info">Compressed PDF · ${fmtSize(blob.size)} (from ${fmtSize(state.compressPdfFile.size)})</div>
+        <a href="${url}" download="compressed.pdf">Save</a>
+      </div>` + (blob.size > targetBytes ? `<div class="warn">Couldn't quite reach your target without very heavy quality loss — this is the smallest reasonable result.</div>` : '');
+    runBtn.disabled = false; runBtn.textContent = 'Compress PDF';
+  });
+}
+
+function render(){
+  renderCatTabs();
+  renderFilmstrip();
+  if(state.category === 'image'){
+    if(state.tool==='compress') renderCompress();
+    else if(state.tool==='resize') renderResize();
+    else if(state.tool==='convert') renderConvert();
+    else if(state.tool==='crop') renderCrop();
+    else if(state.tool==='effects') renderEffects();
+    else if(state.tool==='topdf') renderToPdf();
+    else if(state.tool==='passport') renderPassport();
+  } else {
+    if(state.tool==='mergepdf') renderMergePdf();
+    else if(state.tool==='splitpdf') renderSplitPdf();
+    else if(state.tool==='editpdf') renderEditPdf();
+    else if(state.tool==='pdftoimages') renderPdfToImages();
+    else if(state.tool==='compresspdf') renderCompressPdf();
+    else if(state.tool==='docxtopdf') renderDocxToPdf();
+    else if(state.tool==='pdftodocx') renderPdfToDocx();
+    else if(state.tool==='pdftoexcel') renderPdfToExcel();
+  }
+}
+
+// ---------------- THEME TOGGLE ----------------
+function applyThemeUI(){
+  document.getElementById('lightIcon').classList.toggle('active', !document.body.classList.contains('theme-dark'));
+  document.getElementById('darkIcon').classList.toggle('active', document.body.classList.contains('theme-dark'));
+}
+document.getElementById('themeToggle').addEventListener('click', ()=>{
+  document.body.classList.toggle('theme-dark');
+  applyThemeUI();
+});
+applyThemeUI();
+
+render();
+</script>
+</body>
+</html>
