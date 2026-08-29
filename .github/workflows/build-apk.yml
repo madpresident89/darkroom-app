@@ -49,6 +49,13 @@ jobs:
             convert www/icon-512.png -resize ${size}x${size} "$dir/ic_launcher_foreground.png"
           done
 
+      - name: Replace splash screen with Darkroom logo
+        run: |
+          for f in $(find android/app/src/main/res -name "splash.png"); do
+            dims=$(identify -format "%wx%h" "$f")
+            convert www/icon-512.png -resize 42% -gravity center -background "#FBF7F0" -extent "$dims" "$f"
+          done
+
       - name: Allow saving files to the public Downloads folder
         run: |
           MANIFEST=android/app/src/main/AndroidManifest.xml
