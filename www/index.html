@@ -267,6 +267,62 @@ let state = {
   compressPdfBytes: null,
 };
 
+// ---------------- SAVE HELPER (works in a normal browser AND inside the packaged Capacitor app) ----------------
+// A plain browser can download a blob via <a download>. The standalone Android app (Capacitor)
+// runs inside a native WebView that can't trigger that kind of download — so when running inside
+// the app, we instead write the file with Capacitor's Filesystem plugin and hand it to the native
+// Share sheet, which lets you save it to Downloads, Drive, or share it directly.
+let __blobId = 0;
+const __blobs = {};
+function regBlob(blob, name){
+  const id = 'b' + (++__blobId);
+  __blobs[id] = {blob, name};
+  return id;
+}
+function blobToBase64(blob){
+  return new Promise((resolve, reject)=>{
+    const reader = new FileReader();
+    reader.onloadend = () => resolve(reader.result.split(',')[1]);
+    reader.onerror = reject;
+    reader.readAsDataURL(blob);
+  });
+}
+async function saveBlob(blob, filename){
+  const isNative = window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform();
+  if(isNative && window.Capacitor.Plugins && window.Capacitor.Plugins.Filesystem){
+    try {
+      const base64 = await blobToBase64(blob);
+      const { Filesystem, Share } = window.Capacitor.Plugins;
+      const written = await Filesystem.writeFile({
+        path: filename,
+        data: base64,
+        directory: 'CACHE',
+        recursive: true,
+      });
+      if(Share){
+        await Share.share({ title: filename, url: written.uri, dialogTitle: 'Save ' + filename });
+      } else {
+        alert('Saved to Documents: ' + filename);
+      }
+    } catch(e){
+      alert('Could not save "' + filename + '": ' + (e && e.message ? e.message : e));
+    }
+  } else {
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = filename;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(()=>URL.revokeObjectURL(url), 4000);
+  }
+}
+document.addEventListener('click', (e)=>{
+  const t = e.target.closest('[data-blob-id]');
+  if(!t) return;
+  e.preventDefault();
+  const entry = __blobs[t.dataset.blobId];
+  if(entry) saveBlob(entry.blob, entry.name);
+});
+
 const app = document.getElementById('app');
 const filmstrip = document.getElementById('filmstrip');
 const catTabs = document.getElementById('catTabs');
@@ -382,7 +438,7 @@ function resultHTML(res){
     <div class="result">
       <img src="${res.url}" />
       <div class="info">${res.name}<br/>${fmtSize(res.size)}</div>
-      <a href="${res.url}" download="${res.name}">Save</a>
+      <a href="#" data-blob-id="${regBlob(res.blob, res.name)}">Save</a>
     </div>`;
 }
 
@@ -838,7 +894,7 @@ function renderToPdf(){
     document.getElementById('resultBox').innerHTML = `
       <div class="result">
         <div class="info">${state.pdfFiles.length} page PDF · ${fmtSize(blob.size)}</div>
-        <a href="${url}" download="images.pdf">Save</a>
+        <a href="#" data-blob-id="${regBlob(blob,'images.pdf')}">Save</a>
       </div>`;
     runBtn.disabled = false; runBtn.textContent = `Create PDF (${state.pdfFiles.length} pages)`;
   });
@@ -911,7 +967,7 @@ function renderMergePdf(){
     document.getElementById('resultBox').innerHTML = `
       <div class="result">
         <div class="info">Merged PDF · ${fmtSize(blob.size)}</div>
-        <a href="${url}" download="merged.pdf">Save</a>
+        <a href="#" data-blob-id="${regBlob(blob,'merged.pdf')}">Save</a>
       </div>`;
     runBtn.disabled = false; runBtn.textContent = `Merge into one PDF (${state.pdfDocs.length} files)`;
   });
@@ -1003,7 +1059,7 @@ function renderSplitPdf(){
     document.getElementById('resultBox').innerHTML = `
       <div class="result">
         <div class="info">Pages ${from}–${to} · ${fmtSize(blob.size)}</div>
-        <a href="${url}" download="extracted.pdf">Save</a>
+        <a href="#" data-blob-id="${regBlob(blob,'extracted.pdf')}">Save</a>
       </div>`;
     runBtn.disabled = false; runBtn.textContent = 'Extract pages';
   });
@@ -1150,7 +1206,7 @@ function renderEditPdf(){
     const blob = new Blob([bytes], {type:'application/pdf'});
     const url = URL.createObjectURL(blob);
     document.getElementById('resultBox').innerHTML = `
-      <div class="result"><div class="info">Edited PDF · ${fmtSize(blob.size)}</div><a href="${url}" download="edited.pdf">Save</a></div>`;
+      <div class="result"><div class="info">Edited PDF · ${fmtSize(blob.size)}</div><a href="#" data-blob-id="${regBlob(blob,'edited.pdf')}">Save</a></div>`;
     runBtn.disabled = false; runBtn.textContent = 'Export edited PDF';
   });
 }
@@ -1209,7 +1265,7 @@ function renderDocxToPdf(){
       const blob = pdf.output('blob');
       const url = URL.createObjectURL(blob);
       document.getElementById('resultBox').innerHTML = `
-        <div class="result"><div class="info">Converted PDF · ${fmtSize(blob.size)}</div><a href="${url}" download="converted.pdf">Save</a></div>`;
+        <div class="result"><div class="info">Converted PDF · ${fmtSize(blob.size)}</div><a href="#" data-blob-id="${regBlob(blob,'converted.pdf')}">Save</a></div>`;
       runBtn.disabled = false; runBtn.textContent = 'Convert to PDF';
     }, 600);
   });
@@ -1285,7 +1341,7 @@ function renderPdfToDocx(){
     const blob = await Packer.toBlob(doc);
     const url = URL.createObjectURL(blob);
     document.getElementById('resultBox').innerHTML = `
-      <div class="result"><div class="info">Converted DOCX · ${fmtSize(blob.size)}</div><a href="${url}" download="converted.docx">Save</a></div>`;
+      <div class="result"><div class="info">Converted DOCX · ${fmtSize(blob.size)}</div><a href="#" data-blob-id="${regBlob(blob,'converted.docx')}">Save</a></div>`;
     runBtn.disabled = false; runBtn.textContent = 'Convert to DOCX';
   });
 }
@@ -1352,7 +1408,7 @@ function renderPdfToExcel(){
     const blob = new Blob([wbout], {type:'application/octet-stream'});
     const url = URL.createObjectURL(blob);
     document.getElementById('resultBox').innerHTML = `
-      <div class="result"><div class="info">Converted XLSX · ${fmtSize(blob.size)}</div><a href="${url}" download="converted.xlsx">Save</a></div>`;
+      <div class="result"><div class="info">Converted XLSX · ${fmtSize(blob.size)}</div><a href="#" data-blob-id="${regBlob(blob,'converted.xlsx')}">Save</a></div>`;
     runBtn.disabled = false; runBtn.textContent = 'Convert to Excel (.xlsx)';
   });
 }
@@ -1587,7 +1643,7 @@ function setupCropStage(doc){
         <div class="result">
           <img src="${url}"/>
           <div class="info">${sizeLabel} · ${fmtSize(blob.size)}</div>
-          <a href="${url}" download="passport-photo.jpg">Save</a>
+          <a href="#" data-blob-id="${regBlob(blob,'passport-photo.jpg')}">Save</a>
         </div>`;
       const sheetCard = document.getElementById('sheetCard');
       if(sheetCard) sheetCard.style.display = 'block';
@@ -1660,7 +1716,7 @@ function buildPrintSheet(){
       resultBox.innerHTML = `
         <div class="result">
           <div class="info">${cols*rows} copies (${cols}×${rows}${useRotated?', rotated to fit more per sheet':''}) on ${paper.label}, at true ${usedDoc.w}×${usedDoc.h}mm size · ${fmtSize(blob.size)}</div>
-          <a href="${url}" download="passport-sheet.jpg">Save</a>
+          <a href="#" data-blob-id="${regBlob(blob,'passport-sheet.jpg')}">Save</a>
         </div>`;
     }, 'image/jpeg', 0.95);
   };
@@ -1734,7 +1790,7 @@ function renderPdfToImages(){
             <div class="result">
               <img src="${url}"/>
               <div class="info">Page ${i} · ${fmtSize(blob.size)}</div>
-              <a href="${url}" download="page-${i}.${fmt}">Save</a>
+              <a href="#" data-blob-id="${regBlob(blob,'page-'+i+'.'+fmt)}">Save</a>
             </div>`);
           resolve();
         }, mime, 0.92);
@@ -1837,7 +1893,7 @@ function renderCompressPdf(){
     document.getElementById('resultBox').innerHTML = `
       <div class="result">
         <div class="info">Compressed PDF · ${fmtSize(blob.size)} (from ${fmtSize(state.compressPdfFile.size)})</div>
-        <a href="${url}" download="compressed.pdf">Save</a>
+        <a href="#" data-blob-id="${regBlob(blob,'compressed.pdf')}">Save</a>
       </div>` + (blob.size > targetBytes ? `<div class="warn">Couldn't quite reach your target without very heavy quality loss — this is the smallest reasonable result.</div>` : '');
     runBtn.disabled = false; runBtn.textContent = 'Compress PDF';
   });
