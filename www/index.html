@@ -290,19 +290,34 @@ function blobToBase64(blob){
 async function saveBlob(blob, filename){
   const isNative = window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform();
   if(isNative && window.Capacitor.Plugins && window.Capacitor.Plugins.Filesystem){
+    const { Filesystem, Share } = window.Capacitor.Plugins;
     try {
+      if(Filesystem.requestPermissions){
+        try { await Filesystem.requestPermissions(); } catch(_permErr) { /* older plugin builds may not need this call */ }
+      }
       const base64 = await blobToBase64(blob);
-      const { Filesystem, Share } = window.Capacitor.Plugins;
-      const written = await Filesystem.writeFile({
-        path: filename,
-        data: base64,
-        directory: 'CACHE',
-        recursive: true,
-      });
-      if(Share){
-        await Share.share({ title: filename, url: written.uri, dialogTitle: 'Save ' + filename });
-      } else {
-        alert('Saved to Documents: ' + filename);
+      try {
+        // Best-effort direct write into the public Downloads folder. This works reliably on
+        // Android 10 and below (and many Android 11-13 devices in practice) once storage
+        // permission is granted. Newer Android versions restrict this at the OS level regardless
+        // of permission on some devices — if that happens, we fall back to the Share sheet below
+        // so the file is never just lost.
+        await Filesystem.writeFile({
+          path: 'Download/' + filename,
+          data: base64,
+          directory: 'EXTERNAL_STORAGE',
+          recursive: true,
+        });
+        alert('Saved to Downloads: ' + filename);
+      } catch(directErr){
+        const written = await Filesystem.writeFile({
+          path: filename, data: base64, directory: 'CACHE', recursive: true,
+        });
+        if(Share){
+          await Share.share({ title: filename, url: written.uri, dialogTitle: 'Save ' + filename });
+        } else {
+          alert('Could not save directly to Downloads on this Android version. Saved a temporary copy instead.');
+        }
       }
     } catch(e){
       alert('Could not save "' + filename + '": ' + (e && e.message ? e.message : e));
