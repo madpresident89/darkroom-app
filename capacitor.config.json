@@ -1,0 +1,6 @@
+{
+  "appId": "com.madpresident89.darkroom",
+  "appName": "Darkroom",
+  "webDir": "www",
+  "bundledWebRuntime": false
+}
