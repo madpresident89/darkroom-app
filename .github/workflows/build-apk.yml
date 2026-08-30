@@ -29,6 +29,26 @@ jobs:
       - name: Install dependencies
         run: npm install
 
+      - name: Bundle libraries locally (so the app never needs internet to load them)
+        run: |
+          mkdir -p www/libs
+          curl -sL -o www/libs/jspdf.umd.min.js https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js
+          curl -sL -o www/libs/pdf-lib.min.js https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js
+          curl -sL -o www/libs/pdf.min.js https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js
+          curl -sL -o www/libs/pdf.worker.min.js https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js
+          curl -sL -o www/libs/mammoth.browser.min.js https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js
+          curl -sL -o www/libs/html2canvas.min.js https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js
+          curl -sL -o www/libs/docx.umd.js https://cdnjs.cloudflare.com/ajax/libs/docx/8.2.3/index.umd.js
+          curl -sL -o www/libs/xlsx.full.min.js https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js
+          echo "Downloaded files:"
+          ls -la www/libs/
+          for f in www/libs/*.js; do
+            if [ ! -s "$f" ]; then
+              echo "ERROR: $f is empty or missing â€” download failed."
+              exit 1
+            fi
+          done
+
       - name: Add Android platform
         run: npx cap add android
 
