@@ -8,13 +8,13 @@
 <link rel="icon" href="icon-192.png" />
 <link rel="apple-touch-icon" href="icon-192.png" />
 <title>Darkroom — Image &amp; File Toolkit</title>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/docx/8.2.3/index.umd.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="libs/jspdf.umd.min.js"></script>
+<script src="libs/pdf-lib.min.js"></script>
+<script src="libs/pdf.min.js"></script>
+<script src="libs/mammoth.browser.min.js"></script>
+<script src="libs/html2canvas.min.js"></script>
+<script src="libs/docx.umd.js"></script>
+<script src="libs/xlsx.full.min.js"></script>
 <style>
   :root{
     --bg:#FBF7F0;
@@ -1085,7 +1085,7 @@ function renderSplitPdf(){
 
 // ---------------- PDF.js setup ----------------
 if(window.pdfjsLib){
-  pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+  pdfjsLib.GlobalWorkerOptions.workerSrc = 'libs/pdf.worker.min.js';
 }
 
 // ---------------- EDIT PDF (reorder / delete / rotate / add text) ----------------
