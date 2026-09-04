@@ -341,6 +341,18 @@ document.addEventListener('click', (e)=>{
   if(entry) saveBlob(entry.blob, entry.name);
 });
 
+// ---------------- TIMEOUT HELPER ----------------
+// pdf.js loads a background "worker" script to do heavy parsing off the main thread. On some
+// Android WebView versions that worker can silently fail to start — pdf.js then just waits
+// forever with no error and no progress. This wraps any such promise with a hard time limit so
+// that failure mode becomes a clear, actionable error instead of an indefinite freeze.
+function withTimeout(promise, ms, message){
+  return Promise.race([
+    promise,
+    new Promise((_, reject)=> setTimeout(()=> reject(new Error(message || 'Timed out after ' + Math.round(ms/1000) + 's.')), ms)),
+  ]);
+}
+
 const app = document.getElementById('app');
 const filmstrip = document.getElementById('filmstrip');
 const catTabs = document.getElementById('catTabs');
@@ -1090,7 +1102,7 @@ if(window.pdfjsLib){
 
 // ---------------- EDIT PDF (reorder / delete / rotate / add text) ----------------
 async function loadEditPages(bytes){
-  const pdf = await pdfjsLib.getDocument({data: bytes.slice(0)}).promise;
+  const pdf = await withTimeout(pdfjsLib.getDocument({data: bytes.slice(0)}).promise, 25000, 'The PDF engine did not respond in time. Try again, or try a different PDF.');
   const pages = [];
   for(let i=1;i<=pdf.numPages;i++){
     const page = await pdf.getPage(i);
@@ -1149,7 +1161,14 @@ function renderEditPdf(){
     state.editFile = f;
     state.editBytes = bytes;
     app.innerHTML = `<div class="card"><h2>PDF file</h2><div class="hint">Loading pages…</div></div>`;
-    state.editPages = await loadEditPages(bytes);
+    try {
+      state.editPages = await loadEditPages(bytes);
+    } catch(err){
+      app.innerHTML = `<div class="card"><h2>PDF file</h2><div class="warn">Could not open this PDF: ${err && err.message ? err.message : err}</div></div>`;
+      state.editFile = null; state.editBytes = null;
+      inp.value = '';
+      return;
+    }
     inp.value = '';
     render();
   };
@@ -1266,34 +1285,43 @@ function renderDocxToPdf(){
 
   const runBtn = document.getElementById('runBtn');
   if(runBtn) runBtn.addEventListener('click', async ()=>{
-    runBtn.disabled = true; runBtn.textContent = 'Converting…';
-    const arrayBuffer = await state.docxFile.arrayBuffer();
-    const result = await mammoth.convertToHtml({arrayBuffer});
-    const holder = document.getElementById('docxRender');
-    holder.innerHTML = `<div style="font-family:Georgia,serif;font-size:14px;line-height:1.5">${result.value}</div>`;
-    const { jsPDF } = window.jspdf;
-    const pdf = new jsPDF({unit:'pt', format:'a4'});
-    await pdf.html(holder, {
-      x: 20, y: 20,
-      width: 555,
-      windowWidth: 700,
-      html2canvas: { scale: 0.8 },
-    });
-    setTimeout(()=>{
-      const blob = pdf.output('blob');
-      const url = URL.createObjectURL(blob);
-      document.getElementById('resultBox').innerHTML = `
-        <div class="result"><div class="info">Converted PDF · ${fmtSize(blob.size)}</div><a href="#" data-blob-id="${regBlob(blob,'converted.pdf')}">Save</a></div>`;
+    runBtn.disabled = true; runBtn.textContent = 'Reading document…';
+    const resultBox = document.getElementById('resultBox');
+    resultBox.innerHTML = `<div class="hint">Rendering can take a minute or two on a phone, especially for longer documents — this isn't frozen, there's just no per-page progress available for this step.</div>`;
+    try {
+      const arrayBuffer = await state.docxFile.arrayBuffer();
+      const result = await mammoth.convertToHtml({arrayBuffer});
+      const holder = document.getElementById('docxRender');
+      holder.innerHTML = `<div style="font-family:Georgia,serif;font-size:14px;line-height:1.5">${result.value}</div>`;
+      runBtn.textContent = 'Rendering to PDF…';
+      const { jsPDF } = window.jspdf;
+      const pdf = new jsPDF({unit:'pt', format:'a4'});
+      await pdf.html(holder, {
+        x: 20, y: 20,
+        width: 555,
+        windowWidth: 700,
+        html2canvas: { scale: 0.8 },
+      });
+      setTimeout(()=>{
+        const blob = pdf.output('blob');
+        const url = URL.createObjectURL(blob);
+        resultBox.innerHTML = `
+          <div class="result"><div class="info">Converted PDF · ${fmtSize(blob.size)}</div><a href="#" data-blob-id="${regBlob(blob,'converted.pdf')}">Save</a></div>`;
+        runBtn.disabled = false; runBtn.textContent = 'Convert to PDF';
+      }, 600);
+    } catch(e){
       runBtn.disabled = false; runBtn.textContent = 'Convert to PDF';
-    }, 600);
+      resultBox.innerHTML = `<div class="warn">Conversion failed: ${e && e.message ? e.message : e}</div>`;
+    }
   });
 }
 
 // ---------------- PDF -> DOCX (text only) ----------------
-async function extractPdfPages(bytes){
-  const pdf = await pdfjsLib.getDocument({data: bytes.slice(0)}).promise;
+async function extractPdfPages(bytes, onProgress){
+  const pdf = await withTimeout(pdfjsLib.getDocument({data: bytes.slice(0)}).promise, 25000, 'The PDF engine did not respond in time. Try again, or try a different PDF.');
   const pages = [];
   for(let i=1;i<=pdf.numPages;i++){
+    if(onProgress) onProgress(i, pdf.numPages);
     const page = await pdf.getPage(i);
     const content = await page.getTextContent();
     pages.push(content.items);
@@ -1337,8 +1365,23 @@ function renderPdfToDocx(){
 
   const runBtn = document.getElementById('runBtn');
   if(runBtn) runBtn.addEventListener('click', async ()=>{
-    runBtn.disabled = true; runBtn.textContent = 'Converting…';
-    const pages = await extractPdfPages(state.pdfToConvertBytes);
+    runBtn.disabled = true; runBtn.textContent = 'Reading PDF…';
+    const resultBox = document.getElementById('resultBox');
+    resultBox.innerHTML = '';
+    let pages;
+    try {
+      pages = await extractPdfPages(state.pdfToConvertBytes, (i, total)=>{
+        runBtn.textContent = `Reading page ${i} of ${total}…`;
+        if(total > 25 && i === 1){
+          resultBox.innerHTML = `<div class="warn">${total} pages — this can take a few minutes on a phone. The button above will keep updating as it works, so it hasn't frozen even if it's slow.</div>`;
+        }
+      });
+    } catch(e){
+      runBtn.disabled = false; runBtn.textContent = 'Convert to DOCX';
+      resultBox.innerHTML = `<div class="warn">Could not read this PDF: ${e && e.message ? e.message : e}</div>`;
+      return;
+    }
+    runBtn.textContent = 'Building DOCX…';
     const { Document, Packer, Paragraph, TextRun } = docx;
     const children = [];
     pages.forEach((items, pIdx)=>{
@@ -1358,7 +1401,7 @@ function renderPdfToDocx(){
     const doc = new Document({sections:[{children}]});
     const blob = await Packer.toBlob(doc);
     const url = URL.createObjectURL(blob);
-    document.getElementById('resultBox').innerHTML = `
+    resultBox.innerHTML = `
       <div class="result"><div class="info">Converted DOCX · ${fmtSize(blob.size)}</div><a href="#" data-blob-id="${regBlob(blob,'converted.docx')}">Save</a></div>`;
     runBtn.disabled = false; runBtn.textContent = 'Convert to DOCX';
   });
@@ -1402,8 +1445,23 @@ function renderPdfToExcel(){
 
   const runBtn = document.getElementById('runBtn');
   if(runBtn) runBtn.addEventListener('click', async ()=>{
-    runBtn.disabled = true; runBtn.textContent = 'Converting…';
-    const pages = await extractPdfPages(state.pdfToConvertBytes);
+    runBtn.disabled = true; runBtn.textContent = 'Reading PDF…';
+    const resultBox = document.getElementById('resultBox');
+    resultBox.innerHTML = '';
+    let pages;
+    try {
+      pages = await extractPdfPages(state.pdfToConvertBytes, (i, total)=>{
+        runBtn.textContent = `Reading page ${i} of ${total}…`;
+        if(total > 25 && i === 1){
+          resultBox.innerHTML = `<div class="warn">${total} pages — this can take a few minutes on a phone. The button will keep updating as it works.</div>`;
+        }
+      });
+    } catch(e){
+      runBtn.disabled = false; runBtn.textContent = 'Convert to Excel (.xlsx)';
+      resultBox.innerHTML = `<div class="warn">Could not read this PDF: ${e && e.message ? e.message : e}</div>`;
+      return;
+    }
+    runBtn.textContent = 'Building spreadsheet…';
     const wb = XLSX.utils.book_new();
     pages.forEach((items, pIdx)=>{
       const rows = [];
@@ -1425,7 +1483,7 @@ function renderPdfToExcel(){
     const wbout = XLSX.write(wb, {bookType:'xlsx', type:'array'});
     const blob = new Blob([wbout], {type:'application/octet-stream'});
     const url = URL.createObjectURL(blob);
-    document.getElementById('resultBox').innerHTML = `
+    resultBox.innerHTML = `
       <div class="result"><div class="info">Converted XLSX · ${fmtSize(blob.size)}</div><a href="#" data-blob-id="${regBlob(blob,'converted.xlsx')}">Save</a></div>`;
     runBtn.disabled = false; runBtn.textContent = 'Convert to Excel (.xlsx)';
   });
@@ -1793,26 +1851,31 @@ function renderPdfToImages(){
     runBtn.disabled = true; runBtn.textContent = 'Rendering pages…';
     const resultBox = document.getElementById('resultBox');
     resultBox.innerHTML = '';
-    const pdf = await pdfjsLib.getDocument({data: state.pdfImagesBytes.slice(0)}).promise;
-    for(let i=1;i<=pdf.numPages;i++){
-      const page = await pdf.getPage(i);
-      const viewport = page.getViewport({scale: 2});
-      const c = document.createElement('canvas');
-      c.width = viewport.width; c.height = viewport.height;
-      await page.render({canvasContext: c.getContext('2d'), viewport}).promise;
-      const mime = fmt==='png' ? 'image/png' : 'image/jpeg';
-      await new Promise(resolve=>{
-        c.toBlob((blob)=>{
-          const url = URL.createObjectURL(blob);
-          resultBox.insertAdjacentHTML('beforeend', `
-            <div class="result">
-              <img src="${url}"/>
-              <div class="info">Page ${i} · ${fmtSize(blob.size)}</div>
-              <a href="#" data-blob-id="${regBlob(blob,'page-'+i+'.'+fmt)}">Save</a>
-            </div>`);
-          resolve();
-        }, mime, 0.92);
-      });
+    try {
+      const pdf = await withTimeout(pdfjsLib.getDocument({data: state.pdfImagesBytes.slice(0)}).promise, 25000, 'The PDF engine did not respond in time. Try again, or try a different PDF.');
+      for(let i=1;i<=pdf.numPages;i++){
+        runBtn.textContent = `Rendering page ${i} of ${pdf.numPages}…`;
+        const page = await pdf.getPage(i);
+        const viewport = page.getViewport({scale: 2});
+        const c = document.createElement('canvas');
+        c.width = viewport.width; c.height = viewport.height;
+        await page.render({canvasContext: c.getContext('2d'), viewport}).promise;
+        const mime = fmt==='png' ? 'image/png' : 'image/jpeg';
+        await new Promise(resolve=>{
+          c.toBlob((blob)=>{
+            const url = URL.createObjectURL(blob);
+            resultBox.insertAdjacentHTML('beforeend', `
+              <div class="result">
+                <img src="${url}"/>
+                <div class="info">Page ${i} · ${fmtSize(blob.size)}</div>
+                <a href="#" data-blob-id="${regBlob(blob,'page-'+i+'.'+fmt)}">Save</a>
+              </div>`);
+            resolve();
+          }, mime, 0.92);
+        });
+      }
+    } catch(err){
+      resultBox.innerHTML = `<div class="warn">Could not process this PDF: ${err && err.message ? err.message : err}</div>`;
     }
     runBtn.disabled = false; runBtn.textContent = 'Convert every page to an image';
   });
@@ -1875,44 +1938,48 @@ function renderCompressPdf(){
     const kbVal = parseFloat(document.getElementById('targetKb').value)||200;
     const unit = document.getElementById('targetUnit').value;
     const targetBytes = unit==='mb' ? kbVal*1024*1024 : kbVal*1024;
+    const resultBox = document.getElementById('resultBox');
 
-    const pdfDoc = await pdfjsLib.getDocument({data: state.compressPdfBytes.slice(0)}).promise;
-    const numPages = pdfDoc.numPages;
+    try {
+      const pdfDoc = await withTimeout(pdfjsLib.getDocument({data: state.compressPdfBytes.slice(0)}).promise, 25000, 'The PDF engine did not respond in time. Try again, or try a different PDF.');
+      const numPages = pdfDoc.numPages;
 
-    async function buildAtQuality(scale, quality){
-      const { jsPDF } = window.jspdf;
-      let out = null;
-      for(let i=1;i<=numPages;i++){
-        runBtn.textContent = `Rendering page ${i}/${numPages}…`;
-        const page = await pdfDoc.getPage(i);
-        const viewport = page.getViewport({scale});
-        const c = document.createElement('canvas');
-        c.width = viewport.width; c.height = viewport.height;
-        await page.render({canvasContext: c.getContext('2d'), viewport}).promise;
-        const imgData = c.toDataURL('image/jpeg', quality);
-        const wPt = viewport.width * 72/96, hPt = viewport.height * 72/96;
-        if(!out) out = new jsPDF({unit:'pt', format:[wPt,hPt]});
-        else out.addPage([wPt,hPt]);
-        out.addImage(imgData, 'JPEG', 0, 0, wPt, hPt);
+      async function buildAtQuality(scale, quality){
+        const { jsPDF } = window.jspdf;
+        let out = null;
+        for(let i=1;i<=numPages;i++){
+          runBtn.textContent = `Rendering page ${i}/${numPages}…`;
+          const page = await pdfDoc.getPage(i);
+          const viewport = page.getViewport({scale});
+          const c = document.createElement('canvas');
+          c.width = viewport.width; c.height = viewport.height;
+          await page.render({canvasContext: c.getContext('2d'), viewport}).promise;
+          const imgData = c.toDataURL('image/jpeg', quality);
+          const wPt = viewport.width * 72/96, hPt = viewport.height * 72/96;
+          if(!out) out = new jsPDF({unit:'pt', format:[wPt,hPt]});
+          else out.addPage([wPt,hPt]);
+          out.addImage(imgData, 'JPEG', 0, 0, wPt, hPt);
+        }
+        return out.output('blob');
       }
-      return out.output('blob');
-    }
 
-    let scale = 1.5, quality = 0.75, blob = await buildAtQuality(scale, quality);
-    let attempts = 0;
-    while(blob.size > targetBytes && attempts < 5){
-      if(quality > 0.35) quality -= 0.15;
-      else scale = Math.max(0.6, scale - 0.3);
-      blob = await buildAtQuality(scale, quality);
-      attempts++;
-    }
+      let scale = 1.5, quality = 0.75, blob = await buildAtQuality(scale, quality);
+      let attempts = 0;
+      while(blob.size > targetBytes && attempts < 5){
+        if(quality > 0.35) quality -= 0.15;
+        else scale = Math.max(0.6, scale - 0.3);
+        blob = await buildAtQuality(scale, quality);
+        attempts++;
+      }
 
-    const url = URL.createObjectURL(blob);
-    document.getElementById('resultBox').innerHTML = `
-      <div class="result">
-        <div class="info">Compressed PDF · ${fmtSize(blob.size)} (from ${fmtSize(state.compressPdfFile.size)})</div>
-        <a href="#" data-blob-id="${regBlob(blob,'compressed.pdf')}">Save</a>
-      </div>` + (blob.size > targetBytes ? `<div class="warn">Couldn't quite reach your target without very heavy quality loss — this is the smallest reasonable result.</div>` : '');
+      resultBox.innerHTML = `
+        <div class="result">
+          <div class="info">Compressed PDF · ${fmtSize(blob.size)} (from ${fmtSize(state.compressPdfFile.size)})</div>
+          <a href="#" data-blob-id="${regBlob(blob,'compressed.pdf')}">Save</a>
+        </div>` + (blob.size > targetBytes ? `<div class="warn">Couldn't quite reach your target without very heavy quality loss — this is the smallest reasonable result.</div>` : '');
+    } catch(err){
+      resultBox.innerHTML = `<div class="warn">Could not compress this PDF: ${err && err.message ? err.message : err}</div>`;
+    }
     runBtn.disabled = false; runBtn.textContent = 'Compress PDF';
   });
 }
